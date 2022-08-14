@@ -1,0 +1,28 @@
+---
+- name: Instalar o Nginx
+  hosts: all
+  
+  tasks:
+  - name: Adicionando epel-release repo
+    yum:
+      name: epel-release
+      state: present
+
+  - name: Instalando o Nginx
+    yum:
+      name: nginx
+      state: installed
+      update_cache: true
+    notify:
+      - start nginx
+
+  - name: Iniciando Nginx
+    service:
+      name: nginx
+      state: started
+
+  - name: Parando e desativando o firewalld
+    service:
+      name: firewalld
+      state: stopped
+      enabled: false

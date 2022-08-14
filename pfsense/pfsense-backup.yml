@@ -1,0 +1,5 @@
+- name: Playbook pfSense Backup Configs...
+  hosts: all
+  gather_facts: False
+  roles:
+    - backup

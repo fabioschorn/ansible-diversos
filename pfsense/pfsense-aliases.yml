@@ -1,0 +1,5 @@
+- name: Playbook pfSense Create Aliases...
+  hosts: all
+  gather_facts: False
+  roles:
+    - alias

@@ -1,0 +1,12 @@
+---
+  - name: Instalar o pacote nmap
+    hosts: all
+    gather_facts: False
+    
+    tasks:
+      - name: Executar pkg install
+        shell: sudo pkg install -y nmap
+        register: pkginstallnmap
+
+      - debug:
+          var: pkginstallnmap.stdout_lines

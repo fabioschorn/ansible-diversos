@@ -1,0 +1,12 @@
+---
+  - name: Instalar o pacote fping
+    hosts: all
+    gather_facts: False
+    
+    tasks:
+      - name: Executar pkg install
+        shell: sudo pkg install -y fping
+        register: pkginstallfpig
+
+      - debug:
+          var: pkginstallfpig.stdout_lines

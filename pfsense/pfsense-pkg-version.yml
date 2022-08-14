@@ -1,0 +1,12 @@
+---
+  - name: Validar versao pkg no pfsense
+    hosts: all
+    gather_facts: False
+    
+    tasks:
+      - name: Executar pkg version
+        shell: sudo pkg -v
+        register: pkgv
+
+      - debug:
+          var: pkgv.stdout_lines

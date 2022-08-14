@@ -1,0 +1,35 @@
+---
+# Getting user path from home variable
+ - name: Registering user path variable
+   shell: echo $HOME
+   register: output
+
+# Copying fix file to home user
+ - name: copying 302.diff to {{output.stdout}}
+   copy: src=302.diff dest=$HOME
+
+# Applying patch to fix bug of easyrule
+ - name: Apply patch 302.diff
+   shell: sudo patch /usr/local/bin/easyrule $HOME/302.diff
+
+ - name: Port Allowed SSH to Server Teste
+   shell: sudo easyrule pass INT tcp 192.168.253.169 `ifconfig em1 | grep inet | grep -v inet6 | awk '{print $2}' | cut -d"." -f1-3`.0/24 22
+   when: ansible_interfaces == "em1"
+
+ - name: Port Allowed WinRM to Server Teste
+   shell: sudo easyrule pass INT tcp 192.168.253.169 `ifconfig em1 | grep inet | grep -v inet6 | awk '{print $2}' | cut -d"." -f1-3`.0/24 5985
+   when: ansible_interfaces == "em1"
+
+ - name: Port Allowed SSH to Server Teste
+   shell: sudo easyrule pass INT tcp 192.168.253.169 `ifconfig vmx1 | grep inet | grep -v inet6 | awk '{print $2}' | cut -d"." -f1-3`.0/24 22
+   when: ansible_interfaces == "vmx1"
+
+ - name: Port Allowed WinRM to Server Teste
+   shell: sudo easyrule pass INT tcp 192.168.253.169 `ifconfig vmx1 | grep inet | grep -v inet6 | awk '{print $2}' | cut -d"." -f1-3`.0/24 5985
+   when: ansible_interfaces == "vmx1"
+
+# Removing fix file from pfSense
+ - name: Removing patch file from {{output.stdout}}
+   file:
+     path: $HOME/302.diff
+     state: absent

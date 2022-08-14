@@ -1,0 +1,12 @@
+---
+  - name: Verifica o uptime dos hosts
+    hosts: all
+    gather_facts: False
+    
+    tasks:
+      - name: Running Uptime
+        register: uptimeoutput
+        command: "uptime"
+
+      - debug:
+          var: uptimeoutput.stdout_lines

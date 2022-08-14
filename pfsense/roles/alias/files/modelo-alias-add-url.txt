@@ -1,0 +1,9 @@
+init_config_arr(array('aliases', 'alias', 13));
+$config['aliases']['alias'][13]['name'] = 'grp-urls-google';
+$config['aliases']['alias'][13]['address'] = 'www.google.com www.google.com.br';
+$config['aliases']['alias'][13]['descr'] = 'URL Google.';
+$config['aliases']['alias'][13]['type'] = 'url';
+$config['aliases']['alias'][13]['detail'] = 'Adicionado via script.';
+write_config();
+exec;
+exit

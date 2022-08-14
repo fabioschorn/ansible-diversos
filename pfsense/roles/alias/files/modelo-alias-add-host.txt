@@ -1,0 +1,9 @@
+init_config_arr(array('aliases', 'alias', 10));
+$config['aliases']['alias'][10]['name'] = 'grp-ips-dns-google';
+$config['aliases']['alias'][10]['address'] = '8.8.8.8 8.8.4.4';
+$config['aliases']['alias'][10]['descr'] = 'DNSs Google.';
+$config['aliases']['alias'][10]['type'] = 'host';
+$config['aliases']['alias'][10]['detail'] = 'Adicionado via script.';
+write_config();
+exec;
+exit

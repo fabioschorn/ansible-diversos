@@ -1,0 +1,26 @@
+---
+
+- name: Generating backup file name using hostname + date
+  shell: echo "`hostname`_`date +%d-%m-%Y_%H-%M`"
+  register: output
+
+- name: Generating backup file
+  shell: cat /cf/conf/config.xml > /tmp/{{item}}.xml
+  loop:
+  - "{{ output.stdout }}"
+
+- name: Downloading backup file
+  fetch: 
+    src: /tmp/{{item}}.xml 
+    dest: roles/backup/files/
+    flat: yes
+  loop:
+  - "{{ output.stdout }}"
+
+- name: Removing backup file from /tmp on pfsense
+  file:
+    path: /tmp/{{item}}.xml
+    state: absent
+  loop:
+  - "{{ output.stdout }}"
+...

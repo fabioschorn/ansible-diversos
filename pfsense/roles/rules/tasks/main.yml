@@ -1,0 +1,34 @@
+---
+# - name: Pass ICMP Rede "192.168.6.0/24"
+#   shell: sudo easyrule pass INT icmp 192.168.6.0/24 `ifconfig em1 | grep inet | grep -v inet6 | awk '{print $2}' | cut -d"." -f1-3`.0/24
+
+# - name: Pass Grupo TCP/UDP Rede "192.168.6.0/24"
+#   shell: sudo easyrule pass INT tcp/udp 192.168.6.0/24 `ifconfig em1 | grep inet | grep -v inet6 | awk '{print $2}' | cut -d"." -f1-3`.0/24
+
+# - name: Pass ICMP Rede "192.168.7.0/24"
+#   shell: sudo easyrule pass INT icmp 192.168.7.0/24 `ifconfig em1 | grep inet | grep -v inet6 | awk '{print $2}' | cut -d"." -f1-3`.0/24
+
+# - name: Pass Grupo TCP/UDP Rede "192.168.7.0/24"
+#   shell: sudo easyrule pass INT tcp/udp 192.168.7.0/24 `ifconfig em1 | grep inet | grep -v inet6 | awk '{print $2}' | cut -d"." -f1-3`.0/24
+
+# - name: Pass ICMP Rede "192.168.254.0/24"
+#   shell: sudo easyrule pass INT icmp 192.168.254.0/24 `ifconfig em1 | grep inet | grep -v inet6 | awk '{print $2}' | cut -d"." -f1-3`.0/24
+
+# - name: Pass Grupo TCP/UDP Rede "192.168.254.0/24"
+#   shell: sudo easyrule pass INT tcp/udp 192.168.254.0/24 `ifconfig em1 | grep inet | grep -v inet6 | awk '{print $2}' | cut -d"." -f1-3`.0/24
+
+ - name: Port Allowed SSH to Server Teste
+   shell: sudo easyrule pass INT tcp 192.168.253.169 `ifconfig em1 | grep inet | grep -v inet6 | awk '{print $2}' | cut -d"." -f1-3`.0/24 22
+   when: (ansible_facts['ansible_interfaces'] == "em1")
+
+ - name: Port Allowed WinRM to Server Teste
+   shell: sudo easyrule pass INT tcp 192.168.253.169 `ifconfig em1 | grep inet | grep -v inet6 | awk '{print $2}' | cut -d"." -f1-3`.0/24 5985
+   when: (ansible_facts['ansible_interfaces'] == "em1")
+
+ - name: Port Allowed SSH to Server Teste
+   shell: sudo easyrule pass INT tcp 192.168.253.169 `ifconfig vmx1 | grep inet | grep -v inet6 | awk '{print $2}' | cut -d"." -f1-3`.0/24 22
+   when: ansible_interfaces_device == "vmx1"
+
+ - name: Port Allowed WinRM to Server Teste
+   shell: sudo easyrule pass INT tcp 192.168.253.169 `ifconfig vmx1 | grep inet | grep -v inet6 | awk '{print $2}' | cut -d"." -f1-3`.0/24 5985
+   when: ansible_interfaces_device == "vmx1"

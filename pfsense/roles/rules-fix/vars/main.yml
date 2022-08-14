@@ -1,0 +1,3 @@
+---
+# vars file for rules
+#ansible_python_interpreter: "python"

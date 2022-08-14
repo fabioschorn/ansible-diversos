@@ -1,0 +1,20 @@
+---
+- hosts: all
+  remote_user: root
+  tasks:
+    - name: Limpando o Repo
+      command: yum clean all
+
+    - name: Criando Lista Atual de Pacotes Instalados
+      ansible.builtin.shell:  yum list installed > yum-ansible-antes-$(date +%Y%m%d%H%M).log
+      args:
+        chdir: /var/log/
+
+    - name: Upgrade de Pacotes com Exclusoes
+      yum:
+        name: '*'
+        update_cache: yes
+        update_only: yes
+        state: latest
+        exclude: jdk*
+      register: yum_update_status

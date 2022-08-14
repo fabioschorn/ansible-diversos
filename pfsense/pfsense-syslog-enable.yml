@@ -1,0 +1,8 @@
+- name: Playbook pfSense Including SysLog Configuration...
+  hosts: all
+  gather_facts: False
+  become: yes
+  become_user: root
+  become_method: sudo
+  roles:
+    - syslog-enable

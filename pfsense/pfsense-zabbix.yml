@@ -1,0 +1,12 @@
+---
+  - name: Instalar o pacote Zabbix agent
+    hosts: all
+    gather_facts: False
+    
+    tasks:
+      - name: Executar pkg install
+        shell: sudo pkg install -y pfSense-pkg-zabbix-agent5
+        register: pkginstallzabbix
+
+      - debug:
+          var: pkginstallzabbix.stdout_lines

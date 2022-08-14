@@ -1,0 +1,9 @@
+init_config_arr(array('aliases', 'alias', 12));
+$config['aliases']['alias'][12]['name'] = 'grp-portas-expertsonline';
+$config['aliases']['alias'][12]['address'] = '22 80 161 443 3389';
+$config['aliases']['alias'][12]['descr'] = 'Portas administrativas ExpertsOnline.';
+$config['aliases']['alias'][12]['type'] = 'port';
+$config['aliases']['alias'][12]['detail'] = 'Adicionado via script.';
+write_config();
+exec;
+exit

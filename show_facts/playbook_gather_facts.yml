@@ -1,0 +1,34 @@
+---
+- name: Mostra os facts selecionados
+  hosts: all
+  become: yes
+  become_user: root
+  become_method: sudo
+  gather_facts: True
+
+  vars:
+    filename: "report_pfsenses_{{ ansible_date_time.date }}.csv"
+    filepath: "/tmp/"
+
+  tasks:
+    - name: print Hostname
+      debug:
+        msg: "Hostname: {{ ansible_hostname }}"
+
+    - name: print SO
+      debug:
+        msg: "SO: {{ ansible_distribution }}-{{ ansible_distribution_major_version}}"
+
+    - name: print IPv4
+      debug:
+        msg: "IPv4: {{ ansible_default_ipv4.address }}"
+
+    - debug:
+        msg:
+        - "ansible_distribution {{ hostvars[inventory_hostname].ansible_distribution }}"
+        - "major version {{ hostvars[inventory_hostname].ansible_distribution_major_version }}"
+        - "version {{ hostvars[inventory_hostname].ansible_distribution_version }}"
+
+    - name: Generating local report of facts
+      shell: echo "{{ ansible_hostname }},{{ ansible_distribution }}-{{ ansible_distribution_major_version }},{{ ansible_default_ipv4.address }}" >> {{ filepath }}{{ filename }}
+      delegate_to: localhost

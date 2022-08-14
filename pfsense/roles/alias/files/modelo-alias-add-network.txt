@@ -1,0 +1,9 @@
+init_config_arr(array('aliases', 'alias', 11));
+$config['aliases']['alias'][11]['name'] = 'grp-redes-internas';
+$config['aliases']['alias'][11]['address'] = '192.168.6.0/24 192.168.253.0/24';
+$config['aliases']['alias'][11]['descr'] = 'Redes Internas ExpertsOnline.';
+$config['aliases']['alias'][11]['type'] = 'network';
+$config['aliases']['alias'][11]['detail'] = 'Adicionado via script.';
+write_config();
+exec;
+exit

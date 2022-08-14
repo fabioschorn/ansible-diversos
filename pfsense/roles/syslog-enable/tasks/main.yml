@@ -1,0 +1,26 @@
+---
+- name: Replaces lines from "config.xml" file and activates syslog
+  ansible.builtin.replace:
+    path: /cf/conf/config.xml
+    regexp: '(<syslog>[\s\S]*)</syslog>'
+    replace: |-
+      <syslog>
+        <filterdescriptions>1</filterdescriptions>
+        <nentries>50</nentries>
+        <sourceip></sourceip>
+        <ipproto>ipv4</ipproto>
+        <remoteserver>192.168.6.169:2506</remoteserver>
+        <remoteserver2></remoteserver2>
+        <remoteserver3></remoteserver3>
+        <enable></enable>
+        <logall></logall>
+      </syslog>
+    backup: yes
+
+- name: Removing the cache file
+  ansible.builtin.file:
+    path: /tmp/config.cache
+    state: absent
+
+#- name: Apply changes
+#  shell: sudo /etc/rc.reload_all start

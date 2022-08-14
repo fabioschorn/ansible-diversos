@@ -1,0 +1,5 @@
+- name: Playbook Update pfSense...
+  hosts: all
+  gather_facts: False
+  roles:
+    - update

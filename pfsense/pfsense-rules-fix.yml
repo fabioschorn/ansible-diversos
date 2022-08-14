@@ -1,0 +1,5 @@
+- name: Playbook pfSense Add Rule...
+  hosts: all
+  gather_facts: True
+  roles:
+    - rules-fix
