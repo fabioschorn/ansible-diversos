@@ -1,6 +1,6 @@
-# Ansible Diversos
+# Ansible Miscellaneous
 
-Este repositório é uma coleção de diversos Playbooks Ansible. Segue abaixo a lista de playbooks de exemplos.
+This repository is a collection of various Ansible Playbooks. Below is a list of sample playbooks.
 
 1. [PlayBooks Nginx](https://github.com/fabioschorn/ansible-diversos/tree/main/nginx)
 2. [PlayBooks pfSense](https://github.com/fabioschorn/ansible-diversos/tree/main/pfsense)
