@@ -1,0 +1,61 @@
+---
+- name: "Extend LVM Root partition for OEL 8.x+LVM+XFS."
+  hosts: all
+  remote_user: root
+  gather_facts: true
+  vars:
+# Change the variables as needed.
+    device: /dev/sda
+    partition: 5
+    vg: template-oracle
+    lv: root
+    lv_path: /dev/template-oracle/root
+
+  tasks:
+# After resizing the disk, the new space needs to discovery to be resized.
+    - name: Rescan SCSI bus
+      shell: /bin/sh /usr/bin/rescan-scsi-bus.sh  > /dev/null 2>&1
+
+    - name: Fixing possibles wrarings
+      shell: printf "fix\n" | parted ---pretend-input-tty  {{ device }} print
+
+# Block of create a new primary partition for LVM.
+    - name: "Verifying if binary parted is installed"
+      block:   
+        - name: install parted
+          package:
+            name: parted
+            state: present
+
+    - name: "Read device informatio for {{ device }}"
+      parted: 
+        device: "{{ device }}"
+        unit: MiB
+      register: device_info
+
+    - name: "Create a new lvm partition"
+      ansible.builtin.parted:
+        label: gpt
+        state: present
+        device: "{{ device }}"
+        number: "{{ partition }}"
+        flags: [ lvm ]
+        part_start: "{% if device_info.partitions is defined and device_info.partitions|length > 0 %}{{ device_info.partitions[-1].end + 1 }}MiB{% else %}0%{% endif %}"
+        part_end: 100%
+      when: device_info.partitions is defined and device_info.partitions|length > 0
+
+    - name: "Executing Partprobe"
+      shell: partprobe -s
+
+# Block of extend the LVM.
+    - name: "Add the new partition to the LVM"
+      shell: pvcreate {{ device }}{{ partition }}
+
+    - name: "Extend the volume group"
+      shell: vgextend {{ vg }} {{ device }}{{ partition }}
+    
+    - name: "Extend the logical volume"
+      shell: lvextend -l +100%FREE {{ lv_path }}
+        
+    - name: "Resize the filesystem"
+      shell: xfs_growfs {{ lv_path }}

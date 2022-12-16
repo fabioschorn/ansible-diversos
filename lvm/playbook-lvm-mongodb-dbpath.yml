@@ -1,0 +1,90 @@
+---
+- name: "Creating a new partition for MongoDB in OEL 8.x."
+  hosts: all
+  remote_user: root
+  gather_facts: true
+  vars:
+# Change the variables as needed.
+    device: /dev/sdb
+    partition: 1
+# Do not use "-" in VG and LV names.
+    vg: vg01_dados
+    lv: lv01_dados
+    dbpath: /mnt/mongodb-data/
+
+  tasks:
+# After resizing the disk, the new space needs to discovery to be resized.
+    - name: Rescan SCSI bus
+      shell: /bin/sh /usr/bin/rescan-scsi-bus.sh  > /dev/null 2>&1
+
+    - name: Fixing possibles wrarings
+      shell: printf "fix\n" | parted ---pretend-input-tty  {{ device }}  print
+
+# Block of create a new primary partition for LVM.
+    - name: "Verifying if binary parted is installed"
+      block:   
+        - name: install parted
+          package:
+            name: parted
+            state: present
+
+    - name: "Read device informatio for {{ device }}"
+      parted: 
+        device: "{{ device }}"
+        unit: MiB
+      register: device_info
+
+    - name: "Create a new lvm partition"
+      ansible.builtin.parted:
+        label: gpt
+        state: present
+        device: "{{ device }}"
+        number: "{{ partition }}"
+        part_end: 100%
+        part_start: 0%
+        part_type: primary
+        unit: MiB
+      when: device_info.partitions | length == 0
+
+    - name: "Executing Partprobe"
+      shell: partprobe -s
+
+# Block of create a new LVM.
+    - name: "Add the new partition to the LVM"
+      shell: pvcreate {{ device }}{{ partition }}
+
+    - name: "Creating a new LVM"
+      ansible.builtin.lvg:
+        vg: "{{ vg }}"
+        pvs: "{{ device }}{{ partition }}"
+        state: present
+
+    - name: "Creating a new Logical Volume"
+      ansible.builtin.lvol:
+        vg: "{{ vg }}"
+        lv: "{{ lv }}"
+        size: 100%FREE
+        state: present
+    
+    - name: "Formatting the new partition"
+      ansible.builtin.filesystem:
+        fstype: xfs
+        dev: /dev/{{ vg }}/{{ lv }}
+        resizefs: yes
+
+# Block of create a new mount point.
+    - name: "Creating a new directory"
+      file:
+        path: "{{ dbpath }}"
+        state: directory
+        mode: 0755
+
+    - name: "Adding the new partition to fstab"
+      lineinfile:
+        path: /etc/fstab
+        line: "/dev/mapper/{{ vg }}-{{ lv }} {{ dbpath }} xfs defaults 0 0"
+        state: present
+        create: yes
+    
+    - name: "Mounting the new partition"
+      shell: mount -a
