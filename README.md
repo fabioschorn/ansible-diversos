@@ -8,3 +8,4 @@ This repository is a collection of various Ansible Playbooks. Below is a list of
 4. [PlayBooks Show-Facts](https://github.com/fabioschorn/ansible-diversos/tree/main/show_facts)
 5. [PlayBooks Uptime](https://github.com/fabioschorn/ansible-diversos/tree/main/uptime)
 6. [PlayBooks YUM](https://github.com/fabioschorn/ansible-diversos/tree/main/yum_updates)
+7. [PlayBooks LVM](https://github.com/fabioschorn/ansible-diversos/tree/main/lvm)
