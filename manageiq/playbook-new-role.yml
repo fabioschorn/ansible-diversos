@@ -1,0 +1,32 @@
+---
+- name: Create ManageIQ roles in batch
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  # Example ManageIQ Credentials variable must be encrypted with ansible-vault
+  vars_files:
+    - secrets.yml
+
+  vars:
+    api_url: "http://127.0.0.1:3000"
+    csv_file: "tenants.csv"
+
+  tasks:
+    - name: Read CSV file
+      read_csv:
+        path: "{{ csv_file }}"
+        delimiter: ","
+      register: tenants
+
+    - name: Create ManageIQ roles
+      shell: |
+        json_data=$(cat add_roles.json | sed "s/func_vm_user_sample/func_vm_user_{{ item.func }}/g")
+        curl --user '{{ api_username }}:{{ api_password }}' -i -X POST -H "Content-Type: application/json" "{{ api_url }}/api/roles" -d "$json_data"
+      loop: "{{ tenants.list }}"
+      register: result
+      ignore_errors: true
+
+    - name: Show result
+      debug:
+        var: result

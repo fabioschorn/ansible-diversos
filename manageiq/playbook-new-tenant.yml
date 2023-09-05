@@ -1,0 +1,38 @@
+---
+- name: Create tenants in ManageIQ using CSV file
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+# Example ManageIQ Credentials variable must be encrypted with ansible-vault
+  vars_files:
+    secrets.yml
+
+  vars:
+    api_url: "http://127.0.0.1:3000"
+    csv_file: "tenants.csv"
+
+  tasks:
+    - name: Read CSV file
+      read_csv:
+        path: "{{ csv_file }}"
+        delimiter: ","
+      register: tenants
+
+    - name: Create tenants in ManageIQ
+      community.general.manageiq_tenant:
+        name: "{{ item.name }}"
+        description: "{{ item.description }}"
+        parent_id: "{{ item.parent_id }}"
+        quotas:
+          cpu_allocated: "{{ item.cpu }}"
+          mem_allocated: "{{ item.memory }}"
+          storage_allocated: "{{ item.storage }}"
+        manageiq_connection:
+          url: "{{ api_url }}"
+          username: "{{ api_username }}"
+          password: "{{ api_password }}"
+          validate_certs: false
+      loop: "{{ tenants.list }}"
+      loop_control:
+        label: "{{ item.name }}"
