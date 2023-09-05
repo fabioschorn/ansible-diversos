@@ -1,0 +1,54 @@
+---
+- name: "Installing MongoDB 5.x."
+  hosts: all
+  remote_user: root
+  gather_facts: false
+  vars:
+    dbpath: /mnt/mongodb-data/
+
+  tasks:
+    - name: "Adding MongoDB 5.x Repository"
+      yum_repository:
+        name: mongodb-org-5.0
+        description: MongoDB Repository
+        baseurl: https://repo.mongodb.org/yum/redhat/$releasever/mongodb-org/5.0/x86_64/
+        gpgcheck: yes
+        gpgkey: https://www.mongodb.org/static/pgp/server-5.0.asc
+        enabled: yes
+
+    - name: "Installing MongoDB"
+      shell: yum install -y mongodb-org
+    
+    - name: "Changing MongoDB listener configuration"
+      shell: sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mongod.conf
+
+    - name: "Creating MongoDB data directory"
+      shell: "sed -i 's|dbPath: /var/lib/mongo|dbPath: {{ dbpath }}|g' /etc/mongod.conf"
+
+    - name: "Changing storage permissions"
+      ansible.builtin.shell:
+        cmd: |
+          chown -R mongod:mongod {{ dbpath }}
+          chmod -R 0755 {{ dbpath }}
+
+    - name: "Starting MongoDB"
+      service:
+        name: mongod
+        state: started
+        enabled: yes
+
+    - name: "Enabling MongoDB"
+      systemd:
+        name: mongod
+        enabled: yes
+
+    - name: "Configuring firewall rules"
+      firewalld:
+        service: mongodb
+        permanent: yes
+        state: enabled
+
+    - name: "Restarting firewalld"
+      service:
+        name: firewalld
+        state: restarted

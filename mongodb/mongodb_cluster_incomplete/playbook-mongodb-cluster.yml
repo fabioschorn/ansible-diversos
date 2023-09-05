@@ -1,0 +1,18 @@
+---
+# Configure the MongoDB hosts
+- name: "Configure the MongoDB hosts"
+  hosts: mongo:mongodb_leader
+  gather_facts: false
+  vars_files:
+    - vars/config.yml
+  roles:
+    - role: install_mongo
+
+# Initialize replication from the leader
+- name: "Initialize ReplicaSet on MongoDB Leader"
+  hosts: mongodb_leader
+  gather_facts: false
+  vars_files:
+    - vars/config.yml
+  roles:
+    - init_mongo_replication
