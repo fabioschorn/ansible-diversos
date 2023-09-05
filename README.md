@@ -9,3 +9,4 @@ This repository is a collection of various Ansible Playbooks. Below is a list of
 5. [PlayBooks Uptime](https://github.com/fabioschorn/ansible-diversos/tree/main/uptime)
 6. [PlayBooks YUM](https://github.com/fabioschorn/ansible-diversos/tree/main/yum_updates)
 7. [PlayBooks LVM](https://github.com/fabioschorn/ansible-diversos/tree/main/lvm)
+8. [PlayBooks ManageIQ](https://github.com/fabioschorn/ansible-diversos/tree/main/manageiq)
