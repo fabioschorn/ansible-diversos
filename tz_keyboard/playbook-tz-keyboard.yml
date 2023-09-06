@@ -1,0 +1,14 @@
+---
+- name: "Change timezone and keyboard"
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: "Change timezone"
+      command: timedatectl set-timezone America/Sao_Paulo
+
+    - name: "Change keyboard"
+      command: localectl set-keymap br-abnt2
+
+    - name: "Change locale"
+      command: localectl set-locale LANG=pt_BR.UTF-8
