@@ -1,0 +1,13 @@
+---
+- name: Generate user list and IP file
+  hosts: all
+  gather_facts: yes
+
+  tasks:
+  - name: Get list of users
+    shell: "cat /etc/passwd | grep -i '/bin/bash' | cut -d: -f1"
+    register: user_list
+
+  - name: Create IP and user list file
+    local_action: copy content="{{ inventory_hostname }}\n{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}\n{{ user_list.stdout }}" dest="/tmp/{{ inventory_hostname }}.txt"
+    loop: "{{ groups['all'] }}"

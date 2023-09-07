@@ -1,0 +1,15 @@
+---
+- name: Collect users with /bin/bash shell
+  hosts: all
+  gather_facts: no
+
+  tasks:
+    - name: Get users with /bin/bash shell
+      shell: "cat /etc/passwd | grep -i '/bin/bash' | cut -d: -f1"
+      register: users
+
+    - name: Record user list to CSV file
+      lineinfile:
+        path: "/tmp/user_list.csv"
+        line: "{{ inventory_hostname }},{{ users.stdout_lines }}"
+        insertafter: EOF
