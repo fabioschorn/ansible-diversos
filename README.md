@@ -10,3 +10,7 @@ This repository is a collection of various Ansible Playbooks. Below is a list of
 6. [PlayBooks YUM](https://github.com/fabioschorn/ansible-diversos/tree/main/yum_updates)
 7. [PlayBooks LVM](https://github.com/fabioschorn/ansible-diversos/tree/main/lvm)
 8. [PlayBooks ManageIQ](https://github.com/fabioschorn/ansible-diversos/tree/main/manageiq)
+9. [PlayBooks Get-User-List](https://github.com/fabioschorn/ansible-diversos/tree/main/get_user_list)
+10. [PlayBooks VMware](https://github.com/fabioschorn/ansible-diversos/tree/main/vmware)
+11. [PlayBooks Time-Zone-and-Keybord](https://github.com/fabioschorn/ansible-diversos/tree/main/tz_keyboard)
+12. [PlayBooks MongoDB](https://github.com/fabioschorn/ansible-diversos/tree/main/mongodb)
