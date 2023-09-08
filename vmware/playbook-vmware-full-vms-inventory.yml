@@ -1,0 +1,9 @@
+plugin: vmware_vm_inventory
+strict: False
+hostname: "{{ vcenter_hostname }}"
+username: "{{ vcenter_username }}"
+password: "{{ vcenter_password }}"
+validate_certs: False
+with_tags: True
+groups:
+  VMs: True

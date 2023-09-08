@@ -1,0 +1,26 @@
+---
+- name: VM Tag Consultation via vCenter API
+  hosts: localhost
+  gather_facts: yes
+
+  tasks:
+    - name: Login into vCenter and get cookies
+      uri:
+        url: https://{{ vcenter_hostname }}/rest/com/vmware/cis/session
+        force_basic_auth: yes
+        validate_certs: no
+        method: POST
+        user: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+      register: login
+
+    - name: Logout from vCenter
+      uri:
+        url: https://{{ vcenter_hostname }}/rest/com/vmware/cis/session
+        method: DELETE
+        validate_certs: no
+        headers:
+          Cookie: "{{ login.set_cookie }}"
+      register: logout
+    - debug:
+        var: logout
