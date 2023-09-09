@@ -1,0 +1,61 @@
+---
+- name: Configura o Vault Helper nas VMs Linux
+  hosts: all
+  remote_user: root
+  vars:
+    url_vault_helper: https://releases.hashicorp.com/vault-ssh-helper/0.2.1/vault-ssh-helper_0.2.1_linux_amd64.zip
+    download_source_arq: /tmp/vault-ssh-helper_0.2.1_linux_amd64.zip
+    diretorio_vault_binario: /usr/local/bin
+    diretorio_vault_config: /etc/vault-ssh-helper.d
+
+# Melhorias:
+# - Remover a opção de instalar o wget e fazer um copy do tarball via módulo de file copy.
+# - Criar arquivos de template Jinja2 para os SOs para alterar os módulos do PAM: sshd e sudo.
+
+  tasks:
+    - name: Instalando wget e unzip
+      ansible.builtin.package:
+        name:
+          - unzip
+          - wget
+        state: latest
+
+    - name: Download pacote do Vault Helper
+      get_url:
+        url: "{{ url_vault_helper }}"
+        dest: "{{ download_source_arq }}"
+        mode: 0644
+
+    - name: Unzip arquivos Vault Helper
+      ansible.builtin.unarchive:
+        src: "{{ download_source_arq }}"
+        dest: "{{ diretorio_vault_binario }}"
+        copy: no
+        owner: root
+        group: root
+        mode: 0755
+
+    - name: Criando diretorio do config vault
+      file:
+        path: "{{ diretorio_vault_config }}"
+        state: directory
+        mode: 0755
+
+    - name: Criando arquivo de config do Vault Helper
+      copy:
+        content: |
+                  vault_addr = "http://192.168.0.1"
+                  tls_skip_verify = false
+                  ssh_mount_point = "ssh"
+                  allowed_roles = "*"
+        dest: "{{ diretorio_vault_config }}/config.hcl"
+        mode: 0640
+
+    - name: Desativando SELinux CentOS (Online)
+      ansible.builtin.command: setenforce 0
+      when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+    - name: Desativando SELinux (Reboot)
+      selinux:
+        state: disabled
+      when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
