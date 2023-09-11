@@ -14,3 +14,4 @@ This repository is a collection of various Ansible Playbooks. Below is a list of
 10. [PlayBooks VMware](https://github.com/fabioschorn/ansible-diversos/tree/main/vmware)
 11. [PlayBooks Time-Zone-and-Keybord](https://github.com/fabioschorn/ansible-diversos/tree/main/tz_keyboard)
 12. [PlayBooks MongoDB](https://github.com/fabioschorn/ansible-diversos/tree/main/mongodb)
+13. [PlayBooks Hashicorp Vault](https://github.com/fabioschorn/ansible-diversos/tree/main/hashicorp_vault)
