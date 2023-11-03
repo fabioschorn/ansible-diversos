@@ -1,0 +1,26 @@
+---
+- name: "Change root password"
+  hosts: all
+  gather_facts: false
+
+  vars:
+    users:
+      - root
+
+    vault_password: "$ubsTIT11îR0#" # Change this to your own password
+
+  tasks:
+    - name: Set new password for each user
+      shell: usermod --password '{{ vault_password | password_hash("sha512") }}' '{{ item }}'
+      loop: "{{ users }}"
+
+    - name: Verify password change for each user
+      shell: 'echo "{{ vault_password }}" | su - {{ item }} -c "echo success"'
+      loop: "{{ users }}"
+      register: result
+
+    - name: Display output for each user
+      debug:
+        msg: "{{ item.stdout }}"
+      loop: "{{ result.results }}"
+      when: item.rc == 0

@@ -1,0 +1,56 @@
+---
+- name: "Update user password parameters"
+  hosts: all
+  gather_facts: false
+
+  vars:
+    users:
+      - name_user1
+      - name_user2
+      - name_user3
+
+  tasks:
+    - name: Set password hashing algorithm to SHA512
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^ENCRYPT_METHOD'
+        line: 'ENCRYPT_METHOD SHA512'
+        state: present
+        backup: yes
+  
+    - name: Set PASS_MAX_DAYS to 90
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^PASS_MAX_DAYS'
+        line: 'PASS_MAX_DAYS 90'
+        state: present
+        backup: yes
+
+    - name: Set PASS_MIN_DAYS to 10
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^PASS_MIN_DAYS'
+        line: 'PASS_MIN_DAYS 10'
+        state: present
+        backup: yes
+
+    - name: Set PASS_WARN_AGE to 7
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^PASS_WARN_AGE'
+        line: 'PASS_WARN_AGE 7'
+        state: present
+        backup: yes
+
+    - name: Set PASS_MIN_LEN to 8
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^PASS_MIN_LEN'
+        line: 'PASS_MIN_LEN 8'
+        state: present
+        backup: yes
+
+    - name: Set configuration for current users in next login
+      command: chage -M 90 -m 10 -W 7 -d 0 {{ item }}
+      with_items: "{{ users }}"
+      when: users is defined

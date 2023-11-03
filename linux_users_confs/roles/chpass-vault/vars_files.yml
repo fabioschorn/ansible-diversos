@@ -1,0 +1,3 @@
+- name: Change passwords for multiple users
+  vars_files:
+    - passwords.yml

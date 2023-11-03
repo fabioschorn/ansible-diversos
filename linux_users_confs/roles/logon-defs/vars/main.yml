@@ -1,0 +1,6 @@
+---
+# vars file for logon-defs
+users:
+  - name_user1
+  - name_user2
+  - name_user3

@@ -1,0 +1,20 @@
+---
+- name: "Remove users"
+  hosts: all
+  gather_facts: false
+
+  vars:
+    users:
+      - old-admin # This user will be removed from system
+
+  tasks:
+    - name: Remove user from system
+      user:
+        name: "{{ item }}"
+        state: absent
+      loop: "{{ users }}"
+
+    - name: Verify user removal
+      shell: 'id {{ item }}'
+      loop: "{{ users }}"
+      register: result
