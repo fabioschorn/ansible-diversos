@@ -1,0 +1,5 @@
+---
+ntp_package_name: ntp
+ntp_service_name: ntpd
+ntp_template_src: templates/ntp.conf.j2
+ntp_config_path: /etc/ntp.conf

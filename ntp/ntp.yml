@@ -1,0 +1,27 @@
+---
+- name: "Verifying NTP are installed and configured and force NTP to restart"
+  hosts: all
+  gather_facts: false
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: "Install NTP"
+      yum:
+        name: ntp
+        state: present
+
+    - name: "Configure NTP"
+      template:
+        src: "{{ ntp_template_src }}"
+        dest: "{{ ntp_config_path }}"
+        owner: root
+        group: root
+        mode: 0644
+      notify: restart ntpd
+
+  handlers:
+    - name: restart ntpd
+      service:
+        name: ntpd
+        state: restarted
