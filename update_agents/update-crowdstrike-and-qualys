@@ -1,0 +1,62 @@
+---
+- name: "Manage CrowdStrike and Qualys Agents"
+  hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+
+  vars:
+    crowdstrike_rpm: "crowdstrike-agent.rpm"
+    qualys_rpm: "qualys-client.rpm"
+    update_directory: "roles/agents-fix/files"
+
+  tasks:
+    - name: "Check current version of CrowdStrike Falcon Agent"
+      shell: "rpm -qa | grep falcon-sensor"
+      register: falcon_version
+      changed_when: false
+
+    - name: "Check current version of Qualys Cloud Agent"
+      shell: "rpm -qa | grep qualys-cloud-agent"
+      register: qualys_version
+      changed_when: false
+
+    - name: "Copy CrowdStrike Falcon Agent RPM to remote host"
+      copy:
+        src: "{{ update_directory }}/{{ crowdstrike_rpm }}"
+        dest: "/tmp/{{ crowdstrike_rpm }}"
+        mode: 0644
+      when: falcon_version.stdout != "falcon-sensor-5.37.0-11111.x86_64"
+
+    - name: "Copy Qualys Cloud Agent RPM to remote host"
+      copy:
+        src: "{{ update_directory }}/{{ qualys_rpm }}"
+        dest: "/tmp/{{ qualys_rpm }}"
+        mode: 0644
+      when: qualys_version.stdout != "qualys-cloud-agent-2.1.0-11111.x86_64"
+
+    - name: "Install CrowdStrike Falcon Agent"
+      yum:
+        name: "/tmp/{{ crowdstrike_rpm }}"
+        state: present
+      when: falcon_version.stdout != "falcon-sensor-5.37.0-11111.x86_64"
+
+    - name: "Install Qualys Cloud Agent"
+      yum:
+        name: "/tmp/{{ qualys_rpm }}"
+        state: present
+      when: qualys_version.stdout != "qualys-cloud-agent-2.1.0-11111.x86_64"
+
+    - name: "Start CrowdStrike Falcon Agent"
+      service:
+        name: falcon-sensor
+        state: started
+        enabled: yes
+      when: falcon_version.stdout != "falcon-sensor-5.37.0-11111.x86_64"
+
+    - name: "Start Qualys Cloud Agent"
+      service:
+        name: qualys-cloud-agent
+        state: started
+        enabled: yes
+      when: qualys_version.stdout != "qualys-cloud-agent-2.1.0-11111.x86_64"
