@@ -3,7 +3,7 @@
   hosts: all
   become: yes
   become_method: sudo
-  gather_facts: yes
+  gather_facts: false
 
   vars:
     crowdstrike_rpm: "crowdstrike-agent.rpm"

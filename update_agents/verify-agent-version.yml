@@ -1,0 +1,19 @@
+---
+- name: "Check current version of CrowdStrike, Qualys and Splunk Agents"
+  hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: true
+
+  tasks:
+    - name: "Check current version of the following agents"
+      shell: |
+        echo "OS Version: $(cat /etc/os-release | grep -i pretty_name | awk -F '=' '{print $2}')"
+        rpm -qa | grep -i falcon-sensor* | awk -F '-' '{print "falcon-sensor: " $3}'
+        rpm -qa | grep -i qualys-cloud-agent* | awk -F '-' '{print "qualys-cloud-agent: " $4}'
+        rpm -qa | grep -i splunkforwarder* | awk -F '-' '{print "splunkforwarder: " $2}'
+      register: agent_version
+
+    - name: "Print current version of the following agents"
+      debug:
+        msg: "{{ agent_version.stdout_lines }}"
