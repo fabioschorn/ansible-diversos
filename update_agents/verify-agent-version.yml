@@ -1,19 +1,40 @@
 ---
-- name: "Check current version of CrowdStrike, Qualys and Splunk Agents"
+- name: "Check Hostname, IP, Distro, Version, Uptime, CrowdStrike Version, Splunk Version, Qualys Version, Qualys Repo, Pending Updates, and show the output"
   hosts: all
   become: yes
   become_method: sudo
   gather_facts: true
 
   tasks:
-    - name: "Check current version of the following agents"
-      shell: |
-        echo "OS Version: $(cat /etc/os-release | grep -i pretty_name | awk -F '=' '{print $2}')"
-        rpm -qa | grep -i falcon-sensor* | awk -F '-' '{print "falcon-sensor: " $3}'
-        rpm -qa | grep -i qualys-cloud-agent* | awk -F '-' '{print "qualys-cloud-agent: " $4}'
-        rpm -qa | grep -i splunkforwarder* | awk -F '-' '{print "splunkforwarder: " $2}'
-      register: agent_version
+    - name: "Check Uptime store in a variable, but only the time in days"
+      shell: "uptime | awk '{print $3}' | cut -d',' -f1"
+      register: uptime
 
-    - name: "Print current version of the following agents"
-      debug:
-        msg: "{{ agent_version.stdout_lines }}"
+    - name: "Get CrowdStrike Version"
+      shell: |
+        rpm -qa | grep -i falcon-sensor* | awk -F'-' '{print "facon-sensor: " $3}'
+      register: falcon_version
+
+    - name: "Get Splunk Version"
+      shell: |
+        rpm -qa | grep -i splunkforwarder* | awk -F'-' '{print "splunkforwarder: " $2}'
+      register: splunk_version
+
+    - name: "Get Qualys Version"
+      shell: |
+        rpm -qa | grep -i qualys-cloud-agent* | awk -F'-' '{print "qualys-cloud-agent: " $4}'
+      register: qualys_version
+
+    - name: "Show Qualys Repo"
+      shell: if [ $(curl -LI https:qagpublic.qg1.apps.qualys.com/status -o /dev/null -w '%{http_code}\n' -s) == "200" ]; then echo OK; else echo NOT OK; fi
+      register: qualys_repo
+
+    - name: "Get List of Pending Updates, store in a variable and count the total of pending updates and register in a variable"
+      shell: "yum list updates | grep -i updates | wc -l"
+      register: pending_updates
+
+    - name: "Generate Excel report on the Ansible Local Machine"
+      local_action:
+        module: command
+        cmd: python3 generate_excel.py "{{ ansible_hostname }},{{ ansible_default_ipv4.address }},{{ ansible_distribution }},{{ ansible_distribution_version }},{{ uptime.stdout }} days,{{ falcon_version.stdout }},{{ splunk_version.stdout }},{{ qualys_version.stdout }},{{ qualys_repo.stdout }},{{ pending_updates.stdout }}"
+      run_once: true
