@@ -34,7 +34,8 @@
       register: pending_updates
 
     - name: "Generate Excel report on the Ansible Local Machine"
-      local_action:
-        module: command
-        cmd: python3 generate_excel.py "{{ ansible_hostname }},{{ ansible_default_ipv4.address }},{{ ansible_distribution }},{{ ansible_distribution_version }},{{ uptime.stdout }} days,{{ falcon_version.stdout }},{{ splunk_version.stdout }},{{ qualys_version.stdout }},{{ qualys_repo.stdout }},{{ pending_updates.stdout }}"
+      delegate_to: localhost
       run_once: true
+      vars:
+        report_data: "{{ hostvars[inventory_hostname]['ansible_hostname'] }},{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }},{{ hostvars[inventory_hostname]['ansible_distribution'] }},{{ hostvars[inventory_hostname]['ansible_distribution_version'] }},{{ uptime.stdout }} days,{{ falcon_version.stdout }},{{ splunk_version.stdout }},{{ qualys_version.stdout }},{{ qualys_repo.stdout }},{{ pending_updates.stdout }}"
+      command: python3 generate_excel.py "{{ report_data }}"
