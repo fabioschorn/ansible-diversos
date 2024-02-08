@@ -12,17 +12,17 @@
 
     - name: "Get CrowdStrike Version"
       shell: |
-        rpm -qa | grep -i falcon-sensor* | awk -F'-' '{print "facon-sensor: " $3}'
+        rpm -qa | grep -i falcon-sensor* | awk -F'-' '{print $3}'
       register: falcon_version
 
     - name: "Get Splunk Version"
       shell: |
-        rpm -qa | grep -i splunkforwarder* | awk -F'-' '{print "splunkforwarder: " $2}'
+        rpm -qa | grep -i splunkforwarder* | awk -F'-' '{print $2}'
       register: splunk_version
 
     - name: "Get Qualys Version"
       shell: |
-        rpm -qa | grep -i qualys-cloud-agent* | awk -F'-' '{print "qualys-cloud-agent: " $4}'
+        rpm -qa | grep -i qualys-cloud-agent* | awk -F'-' '{print $4}'
       register: qualys_version
 
     - name: "Show Qualys Repo"
@@ -36,9 +36,8 @@
     - name: "Generate CSV report on each host"
       shell: >
         echo "{{ ansible_hostname }},{{ ansible_default_ipv4.address }},
-        {{ ansible_distribution }},{{ ansible_distribution_version }},
-        {{ uptime.stdout }} days,{{ falcon_version.stdout }},
-        {{ splunk_version.stdout }},{{ qualys_version.stdout }},
+        {{ ansible_distribution }},{{ ansible_distribution_version }},{{ uptime.stdout }},
+        {{ falcon_version.stdout }},{{ splunk_version.stdout }},{{ qualys_version.stdout }},
         {{ qualys_repo.stdout }},{{ pending_updates.stdout }}" > /tmp/{{ ansible_hostname }}_report.csv
       args:
         executable: /bin/bash
@@ -48,3 +47,8 @@
         src: "/tmp/{{ ansible_hostname }}_report.csv"
         dest: "/local/path/on/control/machine/reports/{{ ansible_hostname }}_report.csv"
         flat: yes
+
+    - name: "Delete CSV reports from remote hosts"
+      file:
+        path: "/tmp/{{ ansible_hostname }}_report.csv"
+        state: absent
