@@ -1,0 +1,171 @@
+---
+- name: "Playbook to running update on all servers that need it"
+  hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: true
+  vars:
+    packages_file: /tmp/packages.txt
+    kpatch_package: kpatch
+    kpatch_service: kpatch.service
+    quarter_updates: 2024q1
+
+  tasks:
+    - name: "Find all of the files inside yum.repos.d directory"
+      find:
+        paths: "/etc/yum.repos.d/"
+        patterns: "*.mirror"
+      register: mirrors
+
+    - name: "Replace foo with bar in the files"
+      replace:
+        path: "{{ item.path }}"
+        regexp: '20\d+\w+' #'2023q1'
+        replace: "{{ quarter_updates }}"
+      with_items: "{{ mirrors.files }}"
+      when: item.path | regex_search('20\\d+\\w+') # Adjust the regex as necessary
+
+    - name: "Delete all incompatible files in /etc/yum.repos.d/"
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      with_items: "{{ repo_files.files }}"
+      when: not item.path | regex_search('20\\d+\\w+') # Adjust the regex as necessary
+
+    - name: "Recreate Red Hat repo files with correct syntax"
+      template:
+        src: "/path/to/jinja2/template/redhat.repo.j2"
+        dest: "/etc/yum.repos.d/redhat.repo"
+
+    - name: "Clear Cache"
+      command: dnf clean all
+
+    - name: "Clear cache of dnf"
+      shell: "rm -rf /var/cache/dnf"
+
+    - name: "Gen List of Installed Before Packages and Save to Log"
+      ansible.builtin.shell:  dnf list installed > dnf-ansible-before-$(date +%Y%m%d%H%M).log
+      args:
+        chdir: /var/log/
+
+    - name: "Gather facts on listening ports"
+      community.general.listen_ports_facts:
+
+    - name: "Combine TCP and UDP listening ports info"
+      set_fact:
+        combined_ports_info: "{{ ansible_facts.tcp_listen + ansible_facts.udp_listen }}"
+
+    - name: "Write open ports and their services to a log file"
+      copy:
+        dest: /var/log/open-ports-before-restart-{{ ansible_date_time.date }}.log
+        content: |
+          {% for item in combined_ports_info %}
+          Port: {{ item.port }} Protocol: {{ item.protocol }} Service: {{ item.name }} Address: {{ item.address }} PID: {{ item.pid }}
+          {% endfor %}
+        mode: '0644'
+      when: combined_ports_info is defined
+
+    - name: "Verify the list of packages, if there is delete it"
+      shell: "rm -f {{ packages_file }}"
+      ignore_errors: yes
+
+    - name: "Install Python 3"
+      package:
+        name: python3
+        state: present
+
+    - name: "Install pip for Python 3"
+      package:
+        name: python3-pip
+        state: present
+
+    - name: "Set Python 3 as the default python"
+      alternatives:
+        name: python
+        link: /usr/bin/python
+        path: /usr/bin/python3
+      when: ansible_distribution in ['RedHat', 'CentOS']
+
+    - name: "Check for Kernel Live Patching support"
+      ansible.builtin.shell: |
+        if ! rpm -q {{ kpatch_package }} &>/dev/null; then
+          echo "Kpatch not available, installing."
+          exit 1
+        else
+          echo "Kpatch available."
+          exit 0
+        fi
+      register: kpatch_check
+      failed_when: kpatch_check.rc not in [0, 1]
+      changed_when: false
+
+    - name: "Install Kpatch"
+      ansible.builtin.yum:
+        name: "{{ kpatch_package }}"
+        state: present
+      when: kpatch_check.rc == 1
+
+    - name: "Enable and start Kpatch service"
+      ansible.builtin.systemd:
+        name: "{{ kpatch_service }}"
+        enabled: yes
+        state: started
+      when: kpatch_check.rc == 1
+
+    - name: "Verify Kernel Patch Application"
+      ansible.builtin.shell: kpatch list
+      register: kpatch_verify
+      changed_when: false
+
+    - name: "Copy the list from the ansible control to the remote machone"
+      copy:
+        src: "/tmp/{{ packages_file }}"
+        dest: "/tmp/{{ packages_file }}"
+        mode: 0644
+
+    - name: "Read package list from file on control machine"
+      set_fact:
+        packages_to_install: "{{ lookup('file', '/tmp/{{ packages_file }}').splitlines() }}"
+
+    - name: "Install packages package from list and set parameters"
+      shell: yum update -y --advisory {{ item }}
+      with_items: "{{ packages_to_install }}"
+
+    - name: "Gen List of Installed After Packages and Save to Log"
+      ansible.builtin.shell:  dnf list installed > dnf-ansible-after-$(date +%Y%m%d%H%M).log
+      args:
+        chdir: /var/log/
+
+    - name: "Ensure yum-utils is installed"
+      ansible.builtin.yum:
+        name: yum-utils
+        state: present
+
+    - name: "Check if restart is needed, and validate the rc parameters"
+      ansible.builtin.shell: needs-restarting -r
+      register: restart_needed
+      failed_when: restart_needed.rc not in [0, 1]
+
+    - name: "Case the restart necessary execute the restart"
+      ansible.builtin.reboot:
+      when: restart_needed.rc == 1
+
+    - name: "Run iptable command"
+      shell: sysctl -w net.ipv4.ip_forward=1 && iptables -t nat -A POSTROUTING -s && iptables-save
+      register: iptable_output
+      when: "ansible_hostname | regex_search('ecs')"
+
+    - name: "Run Docker restart command"
+      shell: "docker restart $(docker ps -q)"
+      register: docker_output
+      when: "ansible_hostname | regex_search('ecs')"
+
+    - name: "Print iptable command output"
+      debug:
+        var: iptable_output
+      when: iptable_output is defined and ansible_hostname | regex_search('ecs')
+
+    - name: "Print Docker restart command output"
+      debug:
+        var: docker_output
+      when: docker_output is defined and ansible_hostname | regex_search('ecs')

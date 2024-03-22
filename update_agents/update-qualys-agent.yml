@@ -1,0 +1,48 @@
+---
+- name: "Manage Only Qualys Agent"
+  hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: true
+
+  vars:
+    qualys_rpm: "QualysCloudAgent_x64-5.6.0.29.rpm"
+
+  tasks:
+    - name: "Check Uptime store in variable, but get only the time in days"
+      shell: "uptime | awk '{print $3}' | cut -d ',' -f1"
+      register: uptime
+
+    - name: "Check current version of Qualys Cloud Agent"
+      shell: |
+        rpm -qa | grep -i qualys-cloud-agent* | awk -F '-' '{print $4}'
+      register: qualys_version
+
+    - name: "Copy Qualys Cloud Agent RPM to remote host"
+      shell: |
+        curl -o /tmp/{{ qualys_rpm }} http://laas.dc1.es.oneadp.com/agents/Qualys-Cloud/Current/{{ qualys_rpm }}
+      when: qualys_version.stdout != "5.6.0"
+
+    - name: "Install Qualys Cloud Agent"
+      yum:
+        name: "/tmp/{{ qualys_rpm }}"
+        state: present
+      when: qualys_version.stdout != "5.6.0" or qualys_version.stdout == "6.0.0"
+
+    - name: "Recheck current version of Qualys Cloud Agent"
+      shell: |
+        rpm -qa | grep -i qualys-cloud-agent* | awk -F '-' '{print $4}'
+      register: qualys_version_recheck
+
+    - name: "Applying Config of Qualys Cloud Agent"
+      shell: |
+        /usr/local/qualys/cloud-agent/bin/qualys-cloud-agent.sh CustomerId="9c0e25e6-0b33-5af6-e040-10ac13043f6a" ActivationId="d8cf692a-2e8a-4ac6-a8a6-007b0d8f788e" ServerUri=https://qagpublic.qg1.apps.qualys.com/CloudAgent/
+      when: qualys_version_recheck.stdout == "5.6.0"
+
+    - name: "Show repo Qualys"
+      shell: if [ $(curl -LI https://qagpublic.qg1.apps.qualys.com/status -o /dev/null -w '%{http_code}\n' -s) == "200" ]; then echo "OK"; else echo "NOK"; fi
+      register: qualys
+
+    - name: "Check Distro, Version and Uptime in days"
+      debug:
+        msg: "Hostname: {{ ansible_hostname }} | IP: {{ ansible_default_ipv4.address }} | Distro: {{ ansible_distribution }} | Version: {{ ansible_distribution_version }} | Uptime: {{ uptime.stdout }} days | Qualys Agent Version: {{ qualys_version_recheck.stdout }} | Qualys Status: {{ qualys.stdout }}"
