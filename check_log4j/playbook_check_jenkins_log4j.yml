@@ -1,0 +1,70 @@
+---
+- name: "Check for log4j presence in Jenkins"
+  hosts: all
+  remote_user: root
+  gather_facts: true
+  vars:
+    jenkins_home: "/var/lib/jenkins"
+    destination_dir: "/tmp"
+
+  tasks:
+    - name: "Check if Jenkins is running"
+      shell: systemctl is-active jenkins
+      register: jenkins_running
+      failed_when: jenkins_running.rc != 0
+
+    - name: "Check if Jenkins home directory exists"
+      stat:
+        path: "{{ jenkins_home }}"
+      register: jenkins_home_exists
+      failed_when: jenkins_home_exists.stat.exists == false
+
+    - name: "Check if Jenkins home directory is readable"
+      stat:
+        path: "{{ jenkins_home }}"
+      register: jenkins_home_readable
+      failed_when: jenkins_home_readable.stat.readable == false
+
+    - name: "Check for active log4j processes"
+      shell: pgrep -fa 'log4j' | grep 'java'
+      register: log4j_process
+      ignore_errors: true
+
+    - name: "Search for log4j libraries within Jenkins plugins"
+      shell: |
+        find "{{ jenkins_home }}/plugins" -type f -name "*.jar" -exec sh -c 'jar -tvf {} | grep -q log4j && echo "log4j found in: {}"' \;
+      register: log4j_plugins
+      when: jenkins_home_exists.stat.exists == true
+      ignore_errors: true
+
+    - name: "Look for log4j configuration files in Jenkins home"
+      shell: find "{{ jenkins_home }}" -type f -name "log4j*.properties" -or -name "log4j*.xml"
+      register: log4j_config_files
+      when: jenkins_home_exists.stat.exists == true
+      ignore_errors: true
+
+    - name: "Check for Java processes using log4j"
+      shell: for pid in $(pgrep -f 'java'); do ls -l /proc/$pid/fd | grep -i 'log4j' && echo "Java process $pid is using log4j."; done
+      register: java_processes_using_log4j
+      when: jenkins_running.rc == 0
+      ignore_errors: true
+
+    - name: "Write check results to a file with the hostname, in the CSV format"
+      copy:
+        content: |
+          "Jenkins","{{ ansible_hostname }}","{{ jenkins_running.rc }}","{{ log4j_process.stdout }}","{{ log4j_plugins.stdout }}","{{ log4j_config_files.stdout }}","{{ java_processes_using_log4j.stdout }}"
+        dest: "/tmp/jenkins_log4j_check_{{ ansible_date_time.date }}.csv"
+      when: jenkins_running.rc == 0
+
+    - name: "Copy the check results file to the Ansible controller"
+      fetch:
+        src: "/tmp/jenkins_log4j_check_{{ ansible_date_time.date }}.csv"
+        dest: "{{ destination_dir }}"
+        flat: yes
+      when: jenkins_running.rc == 0
+
+    - name: "Delete the check results file from the remote host"
+      file:
+        path: "/tmp/jenkins_log4j_check_{{ ansible_date_time.date }}.csv"
+        state: absent
+      when: jenkins_running.rc == 0
