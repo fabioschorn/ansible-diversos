@@ -1,7 +1,7 @@
 ---
 - name: "Check for log4j presence in Jenkins"
   hosts: all
-  remote_user: root
+  become: yes
   gather_facts: true
   vars:
     jenkins_home: "/var/lib/jenkins"
@@ -11,29 +11,44 @@
     - name: "Check if Jenkins is running"
       shell: systemctl is-active jenkins
       register: jenkins_running
-      failed_when: jenkins_running.rc != 0
+      ignore_errors: true
 
     - name: "Check if Jenkins home directory exists"
       stat:
         path: "{{ jenkins_home }}"
       register: jenkins_home_exists
       failed_when: jenkins_home_exists.stat.exists == false
+      ignore_errors: true
 
     - name: "Check if Jenkins home directory is readable"
       stat:
         path: "{{ jenkins_home }}"
       register: jenkins_home_readable
       failed_when: jenkins_home_readable.stat.readable == false
+      when: jenkins_home_exists.stat.exists == true
+      ignore_errors: true
 
     - name: "Check for active log4j processes"
-      shell: pgrep -fa 'log4j' | grep 'java'
+      shell: ps aux | grep -i 'log4j' | grep -v grep
       register: log4j_process
       ignore_errors: true
 
     - name: "Search for log4j libraries within Jenkins plugins"
       shell: |
         find "{{ jenkins_home }}/plugins" -type f -name "*.jar" -exec sh -c 'jar -tvf {} | grep -q log4j && echo "log4j found in: {}"' \;
+      async: 3600  # Run asynchronously for up to 1 hour
+      poll: 0  # Fire and forget
       register: log4j_plugins
+      when: jenkins_home_exists.stat.exists == true
+      ignore_errors: true
+
+    - name: "Check if the search is complete for a large Jenkins directory"
+      async_status:
+        jid: "{{ log4j_plugins.ansible_job_id }}"
+      register: log4j_plugins_status
+      until: log4j_plugins_status.finished
+      retries: 60  # Retry every minute for up to 1 hour
+      delay: 180 # Wait 3 minutes between retries
       when: jenkins_home_exists.stat.exists == true
       ignore_errors: true
 
