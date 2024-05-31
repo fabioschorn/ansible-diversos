@@ -1,0 +1,68 @@
+---
+- name: "Install Dynatrace OneAgent and restart ColdFusion service"
+  hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: true
+
+  vars:
+    dynatrace_download_url: "https://<YOUR_DYNATRACE_DOWNLOAD_URL>/dynatrace-oneagent.sh"
+    dynatrace_installer: "/tmp/dynatrace-oneagent.sh"
+    coldfusion_service: "coldfusion"
+
+  tasks:
+    - name: "Download Dynatrace OneAgent installer"
+      get_url:
+        url: "{{ dynatrace_download_url }}"
+        dest: "{{ dynatrace_installer }}"
+        mode: '0755'
+      register: download_result
+
+    - name: "Check if Dynatrace installer was downloaded successfully"
+      debug:
+        msg: "Dynatrace installer download result: {{ download_result }}"
+
+    - name: "Install Dynatrace OneAgen"
+      command: "{{ dynatrace_installer }} --set-app-log-content-access=true"
+      register: install_result
+      when: download_result is succeeded
+
+    - name: "Check if Dynatrace OneAgent installation was successful"
+      debug:
+        msg: "Dynatrace OneAgent installation result: {{ install_result }}"
+
+    - name: "Restart ColdFusion service"
+      systemd:
+        name: "{{ coldfusion_service }}"
+        state: restarted
+      register: coldfusion_restart_result
+
+    - name: "Check if ColdFusion service restart was successful"
+      debug:
+        msg: "ColdFusion service restart result: {{ coldfusion_restart_result }}"
+
+    - name: "Ensure Dynatrace OneAgent service is running"
+      systemd:
+        name: oneagent
+        state: started
+        enabled: yes
+      register: oneagent_status
+
+    - name: "Check Dynatrace OneAgent service status"
+      debug:
+        msg: "Dynatrace OneAgent service status: {{ oneagent_status }}"
+
+    - name: "Ensure ColdFusion service is running"
+      systemd:
+        name: "{{ coldfusion_service }}"
+        state: started
+        enabled: yes
+      register: coldfusion_status
+
+    - name: "Check ColdFusion service status"
+      debug:
+        msg: "ColdFusion service status: {{ coldfusion_status }}"
+
+    - name: "Final status check"
+      debug:
+        msg: "Dynatrace OneAgent is {{ oneagent_status.state }} and ColdFusion service is {{ coldfusion_status.state }}"
