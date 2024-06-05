@@ -1,0 +1,35 @@
+---
+- name: "Validate /boot disk space and proceed with tasks"
+  hosts: all
+  remote_user: root
+  gather_facts: true
+
+  tasks:
+    - name: "Check disk space in /boot"
+      shell: df -h /boot --output=avail | tail -n 1
+      register: boot_disk_space
+
+    - name: "Convert disk space to integer"
+      set_fact:
+        boot_disk_space_int: "{{ boot_disk_space.stdout | regex_replace('[^0-9]', '') | int }}"
+
+    - name: "Fail if disk space in /boot is less than 2GB"
+      fail:
+        msg: "The /boot directory has less than 2GB of available space."
+      when: boot_disk_space_int < 2000000
+
+    - name: "Proceeding with next tasks"
+      debug:
+        msg: "Proceeding with the next tasks because /boot has more than 2GB available."
+      when: boot_disk_space_int >= 2000000
+
+    # Add your subsequent tasks here!!!
+    - name: "Display the available space in /boot"
+      shell: df -h /boot --output=avail | tail -n 1
+      register: boot_disk_space_final
+      when: boot_disk_space_int >= 2000000
+
+    - name: "Show the available space in /boot"
+      debug:
+        msg: "The available space in /boot is {{ boot_disk_space_final.stdout }}"
+      when: boot_disk_space_int >= 2000000
