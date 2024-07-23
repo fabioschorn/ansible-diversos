@@ -1,5 +1,5 @@
 ---
-- name: "Check and clean /boot directory if usage is above 60%"
+- name: "Check and clean /boot directory if usage is above 65%"
   hosts: all
   remote_user: root
   gather_facts: false
@@ -9,15 +9,13 @@
       shell: "df -h /boot | awk 'NR==2 {print $5}' | sed 's/%//'"
       register: boot_usage
 
-    - name: "Set fact if /boot usage is greater than 60%"
+    - name: "Set fact if /boot usage is greater than 65%"
       set_fact:
-        boot_usage_high: "{{ boot_usage.stdout | int > 60 }}"
+        boot_usage_high: "{{ boot_usage.stdout | int > 65 }}"
 
-    - name: "Remove unused kernel images if /boot usage is greater than 60%"
-      command: >
-        rpm -q kernel | sort -V | head -n -2 | xargs sudo yum remove -y
+    - name: "Remove unused kernel images if /boot usage is greater than 65%"
+      shell: yum remove --oldinstallonly -y
       when: boot_usage_high | bool
-      register: cleanup_result
       ignore_errors: yes
 
     - name: "Check the size of the /boot directory again"
@@ -25,12 +23,18 @@
       register: boot_usage_after_cleanup
       when: boot_usage_high | bool
 
-    - name: Set fact if /boot usage is still greater than 60% after cleanup
+    - name: Set fact if /boot usage is still greater than 65% after cleanup
       set_fact:
-        boot_usage_still_high: "{{ boot_usage_after_cleanup.stdout | int > 60 }}"
+        boot_usage_still_high: "{{ boot_usage_after_cleanup.stdout | int > 65 }}"
       when: boot_usage_high | bool
 
-    - name: "Fail if /boot usage is still greater than 60%"
-      fail:
-        msg: "Insufficient space in the /boot directory even after cleanup."
+    - name: "Check if /boot usage is still greater than 65% and display message"
+      debug:
+        msg: "Still insufficient space in the /boot directory. Playbook will be terminated."
       when: boot_usage_still_high | bool
+      failed_when: boot_usage_still_high | bool
+
+    - name: "Display message if /boot usage is now sufficient"
+      debug:
+        msg: "Enough space, the next task will be executed."
+      when: not boot_usage_still_high | bool
