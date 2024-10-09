@@ -1,0 +1,87 @@
+---
+- name: "Update SSH and disable ChaCha20-Poly1305 cipher with rollback on failure"
+  hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: true
+
+  vars:
+    quarter_updates: 2024q4
+    sshd_config_path: /etc/ssh/sshd_config
+    cipher_to_disable: 'ChaCha20-Poly1305'
+    backup_dir: /etc/ssh/backups
+    date: "{{ lookup('pipe', 'date +%Y%m%d') }}"
+
+  tasks:
+    - name: "Ensure backup directory exists"
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: "Find all of the files inside yum.repos.d directory"
+      find:
+        paths: "/etc/yum.repos.d/"
+        patterns: "*.mirror"
+      register: mirrors
+
+    - name: "Replace foo with bar in the files"
+      replace:
+        path: "{{ item.path }}"
+        regexp: '20\d+\w+' # Match 2024q2, 2024q3, etc.
+        replace: "{{ quarter_updates }}"
+      with_items: "{{ mirrors.files }}"
+      when: mirrors.matched > 0
+
+    - name: "Ensure the latest version of OpenSSH is installed"
+      yum:
+        name:
+          - openssh
+          - openssh-server
+          - openssh-clients
+        state: latest
+
+    - name: "Generate timestamped backup of sshd_config"
+      copy:
+        src: "{{ sshd_config_path }}"
+        dest: "{{ backup_dir }}/sshd_config_{{ date }}.bak"
+        remote_src: yes
+
+    - name: "Disable ChaCha20-Poly1305 cipher in sshd_config"
+      lineinfile:
+        path: "{{ sshd_config_path }}"
+        regexp: '^Ciphers'
+        line: "Ciphers -{{ cipher_to_disable }}"
+        create: yes
+        backup: yes
+
+    - block:
+        - name: "Restart SSH service"
+          service:
+            name: sshd
+            state: restarted
+
+        - name: "Verify SSHD service is running"
+          systemd:
+            name: sshd
+            state: started
+            enabled: yes
+
+      rescue:
+        - name: "Rollback sshd_config to previous version due to SSH failure"
+          copy:
+            src: "{{ backup_dir }}/sshd_config_{{ date }}.bak"
+            dest: "{{ sshd_config_path }}"
+            remote_src: yes
+
+        - name: "Restart SSH service after rollback"
+          service:
+            name: sshd
+            state: restarted
+
+      always:
+        - name: "Check SSHD service status"
+          systemd:
+            name: sshd
+            state: started
+          ignore_errors: yes
