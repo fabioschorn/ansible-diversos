@@ -33,6 +33,12 @@
       with_items: "{{ mirrors.files }}"
       when: mirrors.matched > 0
 
+    - name: "Generate timestamped backup of sshd_config"
+      copy:
+        src: "{{ sshd_config_path }}"
+        dest: "{{ backup_dir }}/sshd_config_{{ date }}.bak"
+        remote_src: yes
+
     - name: "Ensure the latest version of OpenSSH is installed"
       yum:
         name:
