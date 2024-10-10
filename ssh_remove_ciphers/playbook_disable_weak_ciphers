@@ -1,0 +1,76 @@
+---
+- name: "Update SSH and disable weak ciphers"
+  hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: true
+
+  vars:
+    quarter_updates: 2024q4
+    sshd_config_path: /etc/ssh/sshd_config
+    cipher_to_disable: 'ChaCha20-Poly1305'
+    backup_dir: /etc/ssh/backups
+    date: "{{ lookup('pipe', 'date +%Y%m%d') }}"
+
+  tasks:
+    - name: "Ensure backup directory exists"
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: "Find all of the files inside yum.repos.d directory"
+      find:
+        paths: "/etc/yum.repos.d/"
+        patterns: "*.mirror"
+      register: mirrors
+
+    - name: "Replace foo with bar in the files"
+      replace:
+        path: "{{ item.path }}"
+        regexp: '20\d+\w+' # Match 2024q2, 2024q3, etc.
+        replace: "{{ quarter_updates }}"
+      with_items: "{{ mirrors.files }}"
+      when: mirrors.matched > 0
+
+    - name: "Ensure the latest version of OpenSSH is installed"
+      yum:
+        name:
+          - openssh
+          - openssh-server
+          - openssh-clients
+        state: latest
+
+    - name: "Create custom policy to disable ChaCha20-Poly1305 and CBC-EtM ciphers"
+      command: cp -a /usr/share/crypto-policies/policies/DEFAULT.pol /etc/crypto-policies/policies/modules/DISABLE-CBC.pmod
+
+    - name: "Remove ChaCha20-Poly1305 cipher from the custom policy"
+      lineinfile:
+        path: /etc/crypto-policies/policies/modules/DISABLE-CBC.pmod
+        regexp: 'CHACHA20-POLY1305'
+        state: absent
+
+    - name: "Create policy to disable CBC-EtM cipher"
+      copy:
+        dest: /etc/crypto-policies/policies/modules/NO-CBC.pmod
+        content: |
+          cipher@ssh = -CBC
+
+    - name: "Update crypto policies to disable weak ciphers (ChaCha20-Poly1305, CBC-EtM, SHA-1, CBC)"
+      command: update-crypto-policies --set DEFAULT:DISABLE-CBC:NO-SHA1:NO-CBC
+
+    - name: "Get the current crypto policies configuration for verification"
+      command: update-crypto-policies --show
+      register: crypto_policies
+
+    - name: "Display the current crypto policies configuration"
+      debug:
+        var: crypto_policies.stdout_lines
+
+    - name: "Get the version of OpenSSH"
+      command: ssh -V
+      register: ssh_version
+
+    - name: "Display the version of OpenSSH"
+      debug:
+        var: ssh_version.stdout_lines
