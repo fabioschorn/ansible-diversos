@@ -50,11 +50,8 @@
     - name: "Create custom policy to disable ChaCha20-Poly1305 and CBC-EtM ciphers"
       command: cp -a /usr/share/crypto-policies/policies/DEFAULT.pol /etc/crypto-policies/policies/modules/DISABLE-CBC.pmod
 
-    - name: "Remove ChaCha20-Poly1305 cipher from the custom policy"
-      lineinfile:
-        path: /etc/crypto-policies/policies/modules/DISABLE-CBC.pmod
-        regexp: 'CHACHA20-POLY1305'
-        state: absent
+    - name: "Remove ChaCha20-Poly1305 cipher from the custom policy using sed with regex"
+      command: sed -i 's/ \?ChaCha20-Poly1305//g' /etc/crypto-policies/policies/modules/DISABLE-CBC.pmod
 
     - name: "Create policy to disable CBC-EtM cipher"
       copy:
