@@ -1,0 +1,129 @@
+---
+- name: "Validate conditions and ensure sudo configuration"
+  hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: true
+  vars:
+    # An example IPA user or group to test existence in getent
+    ipa_test_user: "some_ipa_user"
+    # Number of days to check logins. Adjust as needed.
+    login_days: 90
+
+  tasks:
+    ################################################################
+    # 1) Check condition: "IPA client is configured"
+    ################################################################
+
+    - name: "Check if sssd is installed"
+      package:
+        name: sssd
+        state: present
+      register: sssd_pkg_check
+      check_mode: false
+      changed_when: false
+
+    - name: "Check if sssd service is running and enabled"
+      service:
+        name: sssd
+        state: started
+        enabled: true
+      register: sssd_service_check
+      check_mode: false
+      changed_when: false
+
+    - name: "Check if we can find an IPA user (to confirm IPA is accessible)"
+      command: "getent passwd {{ ipa_test_user }}"
+      register: ipa_user_check
+      ignore_errors: true
+      changed_when: false
+
+    ################################################################
+    # 2) Check condition: "Users logging in via SSH keys" 
+    #    + "Check logins in the last 90 days"
+    ################################################################
+
+    - name: "Identify whether there are user authorized_keys files with SSH keys"
+      shell: "grep -Er 'ssh-(rsa|ecdsa|ed25519)' /home/*/.ssh/authorized_keys 2>/dev/null || true"
+      register: ssh_key_search
+      changed_when: false
+
+    - name: Check if there are logins in the last {{ login_days }} days
+      shell: "lastlog -b {{ login_days }} -t 0 | sed 1d | awk '{print $1}' | sort | uniq"
+      register: recent_logins
+      changed_when: false
+
+    ################################################################
+    # 3) Set condition booleans based on results
+    ################################################################
+    - name: "Determine if IPA is configurated"
+      set_fact:
+        ipa_configured: >-
+          {{ 
+            sssd_pkg_check is not failed and 
+            sssd_service_check is not failed and
+            (ipa_user_check.rc == 0)
+          }}
+      changed_when: false
+
+    - name: "Determine if SSH keys exist and there were logins in last {{ login_days }} days"
+      set_fact:
+        ssh_keys_used_recently: >-
+          {{
+            (ssh_key_search.stdout_lines | length) > 0 and
+            (recent_logins.stdout_lines | length) > 0
+          }}
+      changed_when: false
+
+    ################################################################
+    # 4) Debug the conditions
+    ################################################################
+    - name: Show condition results
+      debug:
+        msg:
+          - "ipa_configured = {{ ipa_configured }}"
+          - "ssh_keys_used_recently = {{ ssh_keys_used_recently }}"
+
+    ################################################################
+    # 5) If BOTH conditions are met, configure the system
+    ################################################################
+    - name: "Configure the system (Sudo requirements) if conditions are met"
+      block:
+        - name: Ensure Only Users Logged in To Real tty Can Execute Sudo
+          lineinfile:
+            path: /etc/sudoers
+            regexp: '^Defaults\s+use_pty'
+            line: 'Defaults use_pty'
+            state: present
+            validate: 'visudo -cf %s'
+
+        - name: Ensure Sudo Logfile Exists
+          lineinfile:
+            path: /etc/sudoers
+            regexp: '^Defaults\s+logfile='
+            line: 'Defaults logfile="/var/log/sudo.log"'
+            state: present
+            validate: 'visudo -cf %s'
+
+        - name: "Require Re-Authentication When Using sudo (timestamp_timeout=0)"
+          lineinfile:
+            path: /etc/sudoers
+            regexp: '^Defaults\s+timestamp_timeout='
+            line: 'Defaults timestamp_timeout=0'
+            state: present
+            validate: 'visudo -cf %s'
+
+      when: ipa_configured and ssh_keys_used_recently
+
+    ################################################################
+    # 6) If one or more conditions failed, display message and stop
+    ################################################################
+    - name: "Show which condition(s) failed"
+      debug:
+        msg:
+          - "One or more conditions not met. Exiting..."
+          - "ipa_configured = {{ ipa_configured }}"
+          - "ssh_keys_used_recently = {{ ssh_keys_used_recently }}"
+      when: not (ipa_configured and ssh_keys_used_recently)
+      changed_when: false
+      failed_when: false
