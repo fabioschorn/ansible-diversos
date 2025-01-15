@@ -49,7 +49,7 @@
       changed_when: false
 
     - name: Check if there are logins in the last {{ login_days }} days
-      shell: "lastlog -b {{ login_days }} -t 0 | sed 1d | awk '{print $1}' | sort | uniq"
+      shell: "lastlog -t {{ login_days }} | grep -v 'Never' | grep -v 'Username' | awk '{print $1}' | sort -u"
       register: recent_logins
       changed_when: false
 
@@ -89,31 +89,228 @@
     ################################################################
     - name: "Configure the system (Sudo requirements) if conditions are met"
       block:
-        - name: Ensure Only Users Logged in To Real tty Can Execute Sudo
+        - name: "Gather the package facts"
+          package_facts:
+            manager: auto
+          tags:
+          - always
+
+        - name: XCCDF Value var_sudo_logfile # promote to variable
+          set_fact:
+            var_sudo_logfile: !!str /var/log/sudo.log
+            var_sudo_timestamp_timeout: !!str 5
+          tags:
+          - always
+
+        - name: Ensure logfile is enabled with the appropriate value in /etc/sudoers
           lineinfile:
             path: /etc/sudoers
-            regexp: '^Defaults\s+use_pty'
-            line: 'Defaults use_pty'
-            state: present
-            validate: 'visudo -cf %s'
+            regexp: '^[\\s]*Defaults\\s(.*)\\blogfile=[-]?.+\\b(.*)$'
+            line: 'Defaults \\1logfile={{ var_sudo_logfile }}\\2'
+            validate: '/usr/sbin/visudo -cf %s'
+            backrefs: true
+          register: edit_sudoers_logfile_option
+          tags:
+          - CCE-83601-5
+          - PCI-DSS-Req-10.2.5
+          - PCI-DSSv4-2.2.6
+          - low_complexity
+          - low_disruption
+          - low_severity
+          - no_reboot_needed
+          - restrict_strategy
+          - sudo_custom_logfile
 
-        - name: Ensure Sudo Logfile Exists
+        - name: Enable logfile option with appropriate value in /etc/sudoers
           lineinfile:
             path: /etc/sudoers
-            regexp: '^Defaults\s+logfile='
-            line: 'Defaults logfile="/var/log/sudo.log"'
-            state: present
-            validate: 'visudo -cf %s'
+            line: 'Defaults logfile={{ var_sudo_logfile }}'
+            validate: '/usr/sbin/visudo -cf %s'
+          tags:
+          - CCE-83601-5
+          - PCI-DSS-Req-10.2.5
+          - PCI-DSSv4-2.2.6
+          - low_complexity
+          - low_disruption
+          - low_severity
+          - no_reboot_needed
+          - restrict_strategy
+          - sudo_custom_logfile
 
-        - name: "Require Re-Authentication When Using sudo (timestamp_timeout=0)"
+        - name: Ensure use_pty is enabled in /etc/sudoers
           lineinfile:
             path: /etc/sudoers
-            regexp: '^Defaults\s+timestamp_timeout='
-            line: 'Defaults timestamp_timeout=0'
-            state: present
-            validate: 'visudo -cf %s'
+            regexp: ^[\s]*Defaults.*\buse_pty\b.*$
+            line: Defaults use_pty
+            validate: /usr/sbin/visudo -cf %s
+          tags:
+          - CCE-83798-9
+          - PCI-DSS-Req-10.2.5
+          - PCI-DSSv4-2.2.6
+          - low_complexity
+          - low_disruption
+          - medium_severity
+          - no_reboot_needed
+          - restrict_strategy
+          - sudo_add_use_pty
 
-      when: ipa_configured and ssh_keys_used_recently
+        - name: Find /etc/sudoers.d/ files
+          ansible.builtin.find:
+            paths:
+            - /etc/sudoers.d/
+          register: sudoers
+          tags:
+          - CCE-82279-1
+          - NIST-800-53-CM-6(a)
+          - NIST-800-53-IA-11
+          - PCI-DSSv4-2.2.6
+          - low_complexity
+          - low_disruption
+          - medium_severity
+          - no_reboot_needed
+          - restrict_strategy
+          - sudo_require_authentication
+
+        - name: Remove lines containing NOPASSWD from sudoers files
+          ansible.builtin.replace:
+            regexp: '^(?!#).*[\s]+NOPASSWD[\s]*:.*$'
+            replace: '# \g<1>'
+            path: '{{ item.path }}'
+            validate: '/usr/sbin/visudo -cf %s'
+          with_items:
+          - path: /etc/sudoers
+          - '{{ sudoers.files }}'
+          tags:
+          - CCE-82279-1
+          - NIST-800-53-CM-6(a)
+          - NIST-800-53-IA-11
+          - PCI-DSSv4-2.2.6
+          - low_complexity
+          - low_disruption
+          - medium_severity
+          - no_reboot_needed
+          - restrict_strategy
+          - sudo_require_authentication
+
+        - name: Find /etc/sudoers.d/ files
+          ansible.builtin.find:
+            paths:
+            - /etc/sudoers.d/
+          register: sudoers
+          tags:
+          - CCE-82279-1
+          - NIST-800-53-CM-6(a)
+          - NIST-800-53-IA-11
+          - PCI-DSSv4-2.2.6
+          - low_complexity
+          - low_disruption
+          - medium_severity
+          - no_reboot_needed
+          - restrict_strategy
+          - sudo_require_authentication
+
+        - name: Require Re-Authentication When Using the sudo Command - Find /etc/sudoers.d/* 
+            files containing "Defaults timestamp_timeout"
+          ansible.builtin.find:
+            path: /etc/sudoers.d
+            patterns:
+            contains: '^[\s]*Defaults\s.*\btimestamp_timeout[\s]*=.*'
+          register: sudoers_d_defaults_timestamp_timeout
+          when: '"sudo" in ansible_facts.packages'
+          tags:
+          - CCE-87838-9
+          - DISA-STIG-RHEL-08-010384
+          - NIST-800-53-IA-11
+          - PCI-DSSv4-2.2.6
+          - low_complexity
+          - low_disruption
+          - medium_severity
+          - no_reboot_needed
+          - restrict_strategy
+          - sudo_require_reauthentication
+
+        - name: Require Re-Authentication When Using the sudo Command - Remove "Defaults timestamp_timeout"
+            from /etc/sudoers.d/* files
+          ansible.builtin.lineinfile:
+            path: '{{ item.path }}'
+            regexp: '^[\s]*Defaults\s.*\btimestamp_timeout[\s]*=.*'
+            state: absent
+          with_items: '{{ sudoers_d_defaults_timestamp_timeout.files }}'
+          when: '"sudo" in ansible_facts.packages'
+          tags:
+          - CCE-87838-9
+          - DISA-STIG-RHEL-08-010384
+          - NIST-800-53-IA-11
+          - PCI-DSSv4-2.2.6
+          - low_complexity
+          - low_disruption
+          - medium_severity
+          - no_reboot_needed
+          - restrict_strategy
+          - sudo_require_reauthentication
+
+        - name: Require Re-Authentication When Using the sudo Command - Ensure timestamp_timeout
+            has the appropriate value in /etc/sudoers
+          ansible.builtin.lineinfile:
+            path: /etc/sudoers
+            regexp: '^[\s]*Defaults\s(.*)\btimestamp_timeout[\s]*=[\s]*[-]?\w+\b(.*)$'
+            line: Defaults \1timestamp_timeout={{ var_sudo_timestamp_timeout }}\2
+            validate: /usr/sbin/visudo -cf %s
+            backrefs: true
+          register: edit_sudoers_timestamp_timeout_option
+          tags:
+            - CCE-87838-9
+            - DISA-STIG-RHEL-08-010384
+            - NIST-800-53-IA-11
+            - PCI-DSSv4-2.2.6
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - no_reboot_needed
+            - restrict_strategy
+            - sudo_require_reauthentication
+
+        - name: Require Re-Authentication When Using the sudo Command - Enable 
+            option with correct value in /etc/sudoers
+          ansible.builtin.lineinfile:
+            path: /etc/sudoers
+            line: Defaults timestamp_timeout={{ var_sudo_timestamp_timeout }}
+            validate: /usr/sbin/visudo -cf %s
+          when: |
+                edit_sudoers_timestamp_timeout_option is defined and not edit_sudoers_timestamp_timeout_option.changed
+          tags:
+            - CCE-87838-9
+            - DISA-STIG-RHEL-08-010384
+            - NIST-800-53-IA-11
+            - PCI-DSSv4-2.2.6
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - no_reboot_needed
+            - restrict_strategy
+            - sudo_require_reauthentication
+
+        - name: Require Re-Authentication When Using the sudo Command - Remove timestamp_timeout
+            wrong values in /etc/sudoers
+          ansible.builtin.lineinfile:
+            path: /etc/sudoers
+            regexp: '^[\s]*Defaults\s+(.*)\btimestamp_timeout[\s]*=[\s]*([^{{ var_sudo_timestamp_timeout
+              }}b]|-)?\w+\b(.*)$'
+            state: absent
+            validate: /usr/sbin/visudo -cf %s
+          tags:
+            - CCE-87838-9
+            - DISA-STIG-RHEL-08-010384
+            - NIST-800-53-IA-11
+            - PCI-DSSv4-2.2.6
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - no_reboot_needed
+            - restrict_strategy
+            - sudo_require_reauthentication
+
+      when: '"sudo" in ansible_facts.packages and "ipa_configured == true and ssh_keys_used_recently == false'
 
     ################################################################
     # 6) If one or more conditions failed, display message and stop
