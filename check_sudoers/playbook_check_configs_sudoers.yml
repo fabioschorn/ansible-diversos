@@ -10,6 +10,11 @@
     # Number of days to check logins. Adjust as needed.
     login_days: 90
 
+    # NEW: List of service accounts to restrict
+    service_accounts:
+      - some_service_user
+      - another_service_user
+
   tasks:
     ################################################################
     # 1) Check condition: "IPA client is configured"
@@ -59,8 +64,8 @@
     - name: "Determine if IPA is configurated"
       set_fact:
         ipa_configured: >-
-          {{ 
-            sssd_pkg_check is not failed and 
+          {{
+            sssd_pkg_check is not failed and
             sssd_service_check is not failed and
             (ipa_user_check.rc == 0)
           }}
@@ -89,37 +94,38 @@
     ################################################################
     - name: "Configure the system (Sudo requirements) if conditions are met"
       block:
+
         - name: "Gather the package facts"
           package_facts:
             manager: auto
           tags:
-          - always
+            - always
 
         - name: XCCDF Value var_sudo_logfile # promote to variable
           set_fact:
             var_sudo_logfile: !!str /var/log/sudo.log
             var_sudo_timestamp_timeout: !!str 5
           tags:
-          - always
+            - always
 
         - name: Ensure logfile is enabled with the appropriate value in /etc/sudoers
           lineinfile:
             path: /etc/sudoers
-            regexp: '^[\\s]*Defaults\\s(.*)\\blogfile=[-]?.+\\b(.*)$'
-            line: 'Defaults \\1logfile={{ var_sudo_logfile }}\\2'
+            regexp: '^[\s]*Defaults\s(.*)\blogfile=[-]?.+\b(.*)$'
+            line: 'Defaults \1logfile={{ var_sudo_logfile }}\2'
             validate: '/usr/sbin/visudo -cf %s'
             backrefs: true
           register: edit_sudoers_logfile_option
           tags:
-          - CCE-83601-5
-          - PCI-DSS-Req-10.2.5
-          - PCI-DSSv4-2.2.6
-          - low_complexity
-          - low_disruption
-          - low_severity
-          - no_reboot_needed
-          - restrict_strategy
-          - sudo_custom_logfile
+            - CCE-83601-5
+            - PCI-DSS-Req-10.2.5
+            - PCI-DSSv4-2.2.6
+            - low_complexity
+            - low_disruption
+            - low_severity
+            - no_reboot_needed
+            - restrict_strategy
+            - sudo_custom_logfile
 
         - name: Enable logfile option with appropriate value in /etc/sudoers
           lineinfile:
@@ -127,15 +133,15 @@
             line: 'Defaults logfile={{ var_sudo_logfile }}'
             validate: '/usr/sbin/visudo -cf %s'
           tags:
-          - CCE-83601-5
-          - PCI-DSS-Req-10.2.5
-          - PCI-DSSv4-2.2.6
-          - low_complexity
-          - low_disruption
-          - low_severity
-          - no_reboot_needed
-          - restrict_strategy
-          - sudo_custom_logfile
+            - CCE-83601-5
+            - PCI-DSS-Req-10.2.5
+            - PCI-DSSv4-2.2.6
+            - low_complexity
+            - low_disruption
+            - low_severity
+            - no_reboot_needed
+            - restrict_strategy
+            - sudo_custom_logfile
 
         - name: Ensure use_pty is enabled in /etc/sudoers
           lineinfile:
@@ -144,32 +150,32 @@
             line: Defaults use_pty
             validate: /usr/sbin/visudo -cf %s
           tags:
-          - CCE-83798-9
-          - PCI-DSS-Req-10.2.5
-          - PCI-DSSv4-2.2.6
-          - low_complexity
-          - low_disruption
-          - medium_severity
-          - no_reboot_needed
-          - restrict_strategy
-          - sudo_add_use_pty
+            - CCE-83798-9
+            - PCI-DSS-Req-10.2.5
+            - PCI-DSSv4-2.2.6
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - no_reboot_needed
+            - restrict_strategy
+            - sudo_add_use_pty
 
         - name: Find /etc/sudoers.d/ files
           ansible.builtin.find:
             paths:
-            - /etc/sudoers.d/
+              - /etc/sudoers.d/
           register: sudoers
           tags:
-          - CCE-82279-1
-          - NIST-800-53-CM-6(a)
-          - NIST-800-53-IA-11
-          - PCI-DSSv4-2.2.6
-          - low_complexity
-          - low_disruption
-          - medium_severity
-          - no_reboot_needed
-          - restrict_strategy
-          - sudo_require_authentication
+            - CCE-82279-1
+            - NIST-800-53-CM-6(a)
+            - NIST-800-53-IA-11
+            - PCI-DSSv4-2.2.6
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - no_reboot_needed
+            - restrict_strategy
+            - sudo_require_authentication
 
         - name: Remove lines containing NOPASSWD from sudoers files
           ansible.builtin.replace:
@@ -178,36 +184,36 @@
             path: '{{ item.path }}'
             validate: '/usr/sbin/visudo -cf %s'
           with_items:
-          - path: /etc/sudoers
-          - '{{ sudoers.files }}'
+            - path: /etc/sudoers
+            - '{{ sudoers.files }}'
           tags:
-          - CCE-82279-1
-          - NIST-800-53-CM-6(a)
-          - NIST-800-53-IA-11
-          - PCI-DSSv4-2.2.6
-          - low_complexity
-          - low_disruption
-          - medium_severity
-          - no_reboot_needed
-          - restrict_strategy
-          - sudo_require_authentication
+            - CCE-82279-1
+            - NIST-800-53-CM-6(a)
+            - NIST-800-53-IA-11
+            - PCI-DSSv4-2.2.6
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - no_reboot_needed
+            - restrict_strategy
+            - sudo_require_authentication
 
         - name: Find /etc/sudoers.d/ files
           ansible.builtin.find:
             paths:
-            - /etc/sudoers.d/
+              - /etc/sudoers.d/
           register: sudoers
           tags:
-          - CCE-82279-1
-          - NIST-800-53-CM-6(a)
-          - NIST-800-53-IA-11
-          - PCI-DSSv4-2.2.6
-          - low_complexity
-          - low_disruption
-          - medium_severity
-          - no_reboot_needed
-          - restrict_strategy
-          - sudo_require_authentication
+            - CCE-82279-1
+            - NIST-800-53-CM-6(a)
+            - NIST-800-53-IA-11
+            - PCI-DSSv4-2.2.6
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - no_reboot_needed
+            - restrict_strategy
+            - sudo_require_authentication
 
         - name: Require Re-Authentication When Using the sudo Command - Find /etc/sudoers.d/* 
             files containing "Defaults timestamp_timeout"
@@ -218,16 +224,16 @@
           register: sudoers_d_defaults_timestamp_timeout
           when: '"sudo" in ansible_facts.packages'
           tags:
-          - CCE-87838-9
-          - DISA-STIG-RHEL-08-010384
-          - NIST-800-53-IA-11
-          - PCI-DSSv4-2.2.6
-          - low_complexity
-          - low_disruption
-          - medium_severity
-          - no_reboot_needed
-          - restrict_strategy
-          - sudo_require_reauthentication
+            - CCE-87838-9
+            - DISA-STIG-RHEL-08-010384
+            - NIST-800-53-IA-11
+            - PCI-DSSv4-2.2.6
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - no_reboot_needed
+            - restrict_strategy
+            - sudo_require_reauthentication
 
         - name: Require Re-Authentication When Using the sudo Command - Remove "Defaults timestamp_timeout"
             from /etc/sudoers.d/* files
@@ -238,16 +244,16 @@
           with_items: '{{ sudoers_d_defaults_timestamp_timeout.files }}'
           when: '"sudo" in ansible_facts.packages'
           tags:
-          - CCE-87838-9
-          - DISA-STIG-RHEL-08-010384
-          - NIST-800-53-IA-11
-          - PCI-DSSv4-2.2.6
-          - low_complexity
-          - low_disruption
-          - medium_severity
-          - no_reboot_needed
-          - restrict_strategy
-          - sudo_require_reauthentication
+            - CCE-87838-9
+            - DISA-STIG-RHEL-08-010384
+            - NIST-800-53-IA-11
+            - PCI-DSSv4-2.2.6
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - no_reboot_needed
+            - restrict_strategy
+            - sudo_require_reauthentication
 
         - name: Require Re-Authentication When Using the sudo Command - Ensure timestamp_timeout
             has the appropriate value in /etc/sudoers
@@ -276,8 +282,9 @@
             path: /etc/sudoers
             line: Defaults timestamp_timeout={{ var_sudo_timestamp_timeout }}
             validate: /usr/sbin/visudo -cf %s
-          when: |
-                edit_sudoers_timestamp_timeout_option is defined and not edit_sudoers_timestamp_timeout_option.changed
+          when: >
+            edit_sudoers_timestamp_timeout_option is defined and
+            not edit_sudoers_timestamp_timeout_option.changed
           tags:
             - CCE-87838-9
             - DISA-STIG-RHEL-08-010384
@@ -294,8 +301,7 @@
             wrong values in /etc/sudoers
           ansible.builtin.lineinfile:
             path: /etc/sudoers
-            regexp: '^[\s]*Defaults\s+(.*)\btimestamp_timeout[\s]*=[\s]*([^{{ var_sudo_timestamp_timeout
-              }}b]|-)?\w+\b(.*)$'
+            regexp: '^[\s]*Defaults\s+(.*)\btimestamp_timeout[\s]*=[\s]*([^{{ var_sudo_timestamp_timeout }}b]|-)?\w+\b(.*)$'
             state: absent
             validate: /usr/sbin/visudo -cf %s
           tags:
@@ -310,7 +316,19 @@
             - restrict_strategy
             - sudo_require_reauthentication
 
-      when: '"sudo" in ansible_facts.packages and "ipa_configured == true and ssh_keys_used_recently == false'
+        # NEW: Task to restrict access for service accounts
+        - name: Restrict access to service accounts by disabling interactive shell
+          user:
+            name: "{{ item }}"
+            shell: /sbin/nologin
+          loop: "{{ service_accounts }}"
+          tags:
+            - restrict_service_accounts
+
+      # Condition to run the entire block:
+      when: >
+        "sudo" in ansible_facts.packages and
+        "ipa_configured == true and ssh_keys_used_recently == false"
 
     ################################################################
     # 6) If one or more conditions failed, display message and stop
