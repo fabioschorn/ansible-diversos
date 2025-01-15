@@ -48,31 +48,15 @@
       register: ssh_key_search
       changed_when: false
 
-    - name: "Parse SSH key owners from authorized_keys"
-      set_fact:
-        ssh_key_users: >-
-          {{
-            ssh_key_search.stdout_lines | map('regex_search', '^/home/([^/]+)/.ssh/authorized_keys') | select('defined') | list
-          }}
-      changed_when: false
-
-    - name: "Check if there are logins in the last {{ login_days }} days"
+    - name: Check if there are logins in the last {{ login_days }} days
       shell: "lastlog -t {{ login_days }} | grep -v 'Never' | grep -v 'Username' | awk '{print $1}' | sort -u"
       register: recent_logins
-      changed_when: false
-
-    - name: "Filter users who logged in using SSH keys in the last {{ login_days }} days"
-      set_fact:
-        ssh_key_logins: >-
-          {{
-            recent_logins.stdout_lines | intersect(ssh_key_users)
-          }}
       changed_when: false
 
     ################################################################
     # 3) Set condition booleans based on results
     ################################################################
-    - name: "Determine if IPA is configured"
+    - name: "Determine if IPA is configurated"
       set_fact:
         ipa_configured: >-
           {{ 
@@ -82,10 +66,13 @@
           }}
       changed_when: false
 
-    - name: "Determine if SSH keys were used for logins in the last {{ login_days }} days"
+    - name: "Determine if SSH keys exist and there were logins in last {{ login_days }} days"
       set_fact:
         ssh_keys_used_recently: >-
-          {{ ssh_key_logins | length > 0 }}
+          {{
+            (ssh_key_search.stdout_lines | length) > 0 and
+            (recent_logins.stdout_lines | length) > 0
+          }}
       changed_when: false
 
     ################################################################
