@@ -10,7 +10,7 @@
     # Number of days to check logins. Adjust as needed.
     login_days: 90
 
-    # NEW: List of service accounts to restrict
+    # List of service accounts to restrict
     service_accounts:
       - some_service_user
       - another_service_user
