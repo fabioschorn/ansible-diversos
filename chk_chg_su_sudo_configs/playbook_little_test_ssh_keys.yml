@@ -1,9 +1,9 @@
 ---
-- name: "Correlate SSH keys usage with recent login activity"
+- name: "Correlate recently logged-in users with SSH authorized_keys"
   hosts: all
   become: yes
-  become_method: sudo
   gather_facts: false
+
   vars:
     login_days: 90
 
@@ -31,11 +31,10 @@
     - name: "Collect correlated users who have SSH keys"
       set_fact:
         correlated_users: >-
-          {{
-            key_check.results
-            | selectattr('stdout','!=','')  # Keep only results where grep found something
-            | map(attribute='item')         # 'item' is the user tested
-            | list
+          {{ key_check.results
+             | selectattr('stdout','!=','')  # keep only results where grep found something
+             | map(attribute='item')
+             | list
           }}
 
     ################################################################
