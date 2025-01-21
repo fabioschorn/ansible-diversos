@@ -1,0 +1,58 @@
+---
+- name: "Correlate SSH keys usage with recent login activity"
+  hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: false
+  vars:
+    login_days: 90
+
+  tasks:
+    ################################################################
+    # 1) Identify whether there are user authorized_keys files with SSH keys
+    ################################################################
+    - name: "Identify whether there are user authorized_keys files with SSH keys"
+      shell: "grep -Er 'ssh-(rsa|ecdsa|ed25519)' /home/*/.ssh/authorized_keys 2>/dev/null || true"
+      register: ssh_key_search
+      changed_when: false
+
+    ################################################################
+    # 2) Check if there are logins in the last {{ login_days }} days
+    ################################################################
+    - name: "Check if there are logins in the last {{ login_days }} days"
+      shell: "lastlog -t {{ login_days }} | grep -v 'Never' | grep -v 'Username' | awk '{print $1}' | sort -u"
+      register: recent_logins
+      changed_when: false
+
+    ################################################################
+    # 3) Parse out the user names who have SSH keys
+    ################################################################
+    - name: "Extract usernames from SSH key search results"
+      # Each line from ssh_key_search might look like:
+      #   /home/john/.ssh/authorized_keys:ssh-rsa ...
+      # We capture the third path segment (the username) via regex.
+      set_fact:
+        ssh_key_owners: >-
+          {{
+            ssh_key_search.stdout_lines
+            | map('regex_replace', '^/home/([^/]+)/.*$', '\\1')
+            | list
+            | unique
+          }}
+
+    ################################################################
+    # 4) Correlate users who have SSH keys AND logged in recently
+    ################################################################
+    - name: "Correlate users with SSH keys who have logged in within last {{ login_days }} days"
+      set_fact:
+        correlated_users: "{{ ssh_key_owners | intersect(recent_logins.stdout_lines) }}"
+      changed_when: false
+
+    ################################################################
+    # 5) Output the final correlation
+    ################################################################
+    - name: "Display correlated users"
+      debug:
+        msg: >
+          Users with SSH keys who have logged in the last {{ login_days }} days:
+          {{ correlated_users if correlated_users|length > 0 else "None found." }}
