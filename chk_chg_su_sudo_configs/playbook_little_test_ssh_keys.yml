@@ -3,7 +3,6 @@
   hosts: all
   become: yes
   gather_facts: false
-
   vars:
     login_days: 90
 
@@ -17,7 +16,7 @@
       changed_when: false
 
     ################################################################
-    # 2) Check each of those users for SSH keys in authorized_keys
+    # 2) For each recently logged-in user, check for SSH keys in authorized_keys
     ################################################################
     - name: "Check authorized_keys for each user that has recently logged in"
       shell: "grep -E 'ssh-(rsa|ecdsa|ed25519)' /home/{{ item }}/.ssh/authorized_keys 2>/dev/null || true"
@@ -26,15 +25,16 @@
       changed_when: false
 
     ################################################################
-    # 3) Correlate the two results
+    # 3) Correlate results (find users with non-empty grep results)
     ################################################################
     - name: "Collect correlated users who have SSH keys"
       set_fact:
         correlated_users: >-
-          {{ key_check.results
-             | selectattr('stdout','!=','')  # keep only results where grep found something
-             | map(attribute='item')
-             | list
+          {{
+            key_check.results
+            | selectattr('stdout','!=','')   # keep only entries where grep found something
+            | map(attribute='item')
+            | list
           }}
 
     ################################################################
