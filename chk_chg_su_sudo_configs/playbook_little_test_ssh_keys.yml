@@ -3,6 +3,7 @@
   hosts: all
   become: yes
   gather_facts: false
+
   vars:
     login_days: 90
 
@@ -29,13 +30,7 @@
     ################################################################
     - name: "Collect correlated users who have SSH keys"
       set_fact:
-        correlated_users: >-
-          {{
-            key_check.results
-            | selectattr('stdout','!=','')   # keep only entries where grep found something
-            | map(attribute='item')
-            | list
-          }}
+        correlated_users: "{{ key_check.results | selectattr('stdout','!=','') | map(attribute='item') | list }}"
 
     ################################################################
     # 4) Display which users match both conditions
