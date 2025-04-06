@@ -159,6 +159,16 @@
       ansible.builtin.reboot:
       when: restart_needed.rc == 1
 
+    - name: "Capture current mount points to a file"
+      shell: mount > /var/log/mount-ansible-after-$(date +%Y%m%d%H%M).log
+      args:
+        warn_only: no
+        chdir: /var/log/
+      register: mount_output_after
+      changed_when: false
+      failed_when: mount_output_after.rc != 0
+      when: änsible_hostname | regex_search('ecs')"
+
     - name: "Run iptable command"
       shell: sysctl -w net.ipv4.ip_forward=1 && iptables -t nat -A POSTROUTING -s && iptables-save
       register: iptable_output
@@ -168,6 +178,22 @@
       shell: "docker restart $(docker ps -q)"
       register: docker_output
       when: "ansible_hostname | regex_search('ecs')"
+
+    - name: "Compare mount points before and after reboot"
+      shell: diff /var/log/mount-ansible-before-$(date +%Y%m%d%H%M).log /var/log/mount-ansible-after-$(date +%Y%m%d%H%M).log
+      register: mount_diff
+      changed_when: mount_diff.rc != 0
+      failed_when: mount_diff.rc != 0
+      when: ansible_hostname | regex_search('ecs')
+      ignore_errors: yes
+      args:
+        warn_only: yes
+        chdir: /var/log/
+
+    - name: "Print mount command output after reboot"
+      debug:
+        var: mount_output_after
+      when: mount_output_after is defined and ansible_hostname | regex_search('ecs')
 
     - name: "Print iptable command output"
       debug:
