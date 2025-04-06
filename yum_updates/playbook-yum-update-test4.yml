@@ -43,6 +43,15 @@
     - name: "Clear cache of dnf"
       shell: "rm -rf /var/cache/dnf"
 
+    - name: "Save mount points to a file"
+      shell: mount > /var/log/mount-ansible-before-$(date +%Y%m%d%H%M).log
+      args:
+        warn_only: no
+        chdir: /var/log/
+      register: mount_output
+      changed_when: false
+      failed_when: mount_output.rc != 0
+
     - name: "Gen List of Installed Before Packages and Save to Log"
       ansible.builtin.shell:  dnf list installed > dnf-ansible-before-$(date +%Y%m%d%H%M).log
       args:
