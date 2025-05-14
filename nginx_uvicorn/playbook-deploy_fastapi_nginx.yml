@@ -1,0 +1,178 @@
+---
+# This playbook deploys a FastAPI application with Nginx and Uvicorn
+- name: "Deploy FastAPI with Nginx and Uvicorn"
+  hosts: all
+  become: yes
+  gather_facts: true
+  vars:
+    app_user: ec2-user
+    app_dir: /opt/uvicorn-app
+    venv_dir: /opt/uvicorn-app/venv
+    app_code: |
+      from fastapi import FastAPI, UploadFile
+
+      app = FastAPI()
+
+      @app.get("/")
+      def home():
+          return {"message": "You're inside the secure FastAPI app!"}
+
+      @app.post("/upload")
+      async def upload_csv(file: UploadFile):
+          content = await file.read()
+          return {"filename": file.filename, "length": len(content)}
+    htpasswd_user: admin
+    htpasswd_pass: Secure8669test
+
+  tasks:
+  - name: "Install required packages"
+    dnf:
+      name:
+        - python3
+        - python3-pip
+        - git
+        - nginx
+        - openssl
+        - httpd-tools
+      state: present
+      update_cache: yes
+
+  - name: "Create application directory"
+    file:
+      path: "{{ app_dir }}"
+      state: directory
+      owner: "{{ app_user }}"
+      group: "{{ app_user }}"
+      mode: '0755'
+
+  - name: "Set up Python virtual environment"
+    command: python3 -m venv {{ venv_dir }}
+    args:
+      creates: "{{ venv_dir }}/bin/activate"
+
+  - name: "Install Python dependencies"
+    pip:
+      virtualenv: "{{ venv_dir }}"
+      name:
+        - fastapi
+        - uvicorn
+        - requests
+
+  - name: "Create app directory"
+    file:
+      path: "{{ app_dir }}/app"
+      state: directory
+      owner: "{{ app_user }}"
+      group: "{{ app_user }}"
+
+  - name: "Create FastAPI app"
+    copy:
+      content: "{{ app_code }}"
+      dest: "{{ app_dir }}/app/main.py"
+      owner: "{{ app_user }}"
+      group: "{{ app_user }}"
+      mode: '0644'
+      force: yes
+
+  - name: "Generate self-signed SSL certificate"
+    community.crypto.openssl_certificate:
+      path: /etc/ssl/fastapi/fastapi.crt
+      privatekey_path: /etc/ssl/fastapi/fastapi.key
+      common_name: "fastapi.internal"
+      provider: selfsigned
+      days: 365
+    notify: Restart nginx
+
+  - name: "Create .htpasswd file"
+    community.general.htpasswd:
+      path: /etc/nginx/.htpasswd
+      name: "{{ htpasswd_user }}"
+      password: "{{ htpasswd_pass }}"
+      crypt_scheme: md5
+
+  - name: "Configure NGINX reverse proxy"
+    copy:
+      dest: /etc/nginx/conf.d/fastapi.conf
+      content: |
+        server {
+            listen 443 ssl;
+            server_name _;
+
+            ssl_certificate /etc/ssl/fastapi/fastapi.crt;
+            ssl_certificate_key /etc/ssl/fastapi/fastapi.key;
+
+            location / {
+                auth_basic "Restricted Area";
+                auth_basic_user_file /etc/nginx/.htpasswd;
+
+                proxy_pass http://127.0.0.1:8000;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            }
+        }
+
+        server {
+            listen 80;
+            return 301 https://$host$request_uri;
+        }
+    notify: Restart nginx
+
+  - name: "Create systemd service for Uvicorn"
+    copy:
+      dest: /etc/systemd/system/uvicorn.service
+      content: |
+        [Unit]
+        Description=Uvicorn Server for FastAPI App
+        After=network.target
+
+        [Service]
+        User={{ app_user }}
+        Group={{ app_user }}
+        WorkingDirectory={{ app_dir }}
+        Environment="PATH={{ venv_dir }}/bin"
+        ExecStart={{ venv_dir }}/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+        Restart=always
+        RestartSec=5
+        StandardOutput=syslog
+        StandardError=syslog
+        SyslogIdentifier=uvicorn-app
+
+        [Install]
+        WantedBy=multi-user.target
+    notify: Reload systemd
+
+  - name: "Enable and start Uvicorn service"
+    systemd:
+      name: uvicorn.service
+      enabled: yes
+      state: started
+
+  - name: "Enable and start NGINX"
+    systemd:
+      name: nginx
+      enabled: yes
+      state: started
+
+  handlers:
+    - name: "Reload systemd"
+      command: systemctl daemon-reload
+
+    - name: "Restart nginx"
+      service:
+        name: nginx
+        state: restarted
+        enabled: yes
+
+    - name: "Restart Uvicorn"
+      systemd:
+        name: uvicorn.service
+        state: restarted
+        enabled: yes
+
+    - name: "Restart FastAPI app"
+      systemd:
+        name: uvicorn.service
+        state: restarted
+        enabled: yes
